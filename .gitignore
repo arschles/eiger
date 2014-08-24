@@ -21,3 +21,6 @@ _testmain.go
 
 *.exe
 *.test
+.DS_Store
+agent/agent
+service/service
