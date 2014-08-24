@@ -3,7 +3,7 @@ package main
 import (
 	"code.google.com/p/go.net/websocket"
 	"fmt"
-	"github.com/arschles/eiger/util"
+	"github.com/arschles/eiger/lib/util"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"

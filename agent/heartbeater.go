@@ -2,7 +2,7 @@ package main
 
 import (
 	"code.google.com/p/go.net/websocket"
-	"github.com/arschles/eiger/util"
+	"github.com/arschles/eiger/lib/util"
 	"log"
 	"time"
 )

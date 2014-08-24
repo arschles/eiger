@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"github.com/arschles/eiger/util"
+	"github.com/arschles/eiger/lib/util"
 	"io"
 	"net/url"
 	"sync"

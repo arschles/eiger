@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/arschles/eiger/cmd"
+	"github.com/arschles/eiger/lib/cmd"
 	"github.com/fsouza/go-dockerclient"
 	"io"
 )

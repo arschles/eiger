@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/arschles/eiger/cmd"
-	"github.com/arschles/eiger/util"
-	"github.com/arschles/eiger/ws"
+	"github.com/arschles/eiger/lib/cmd"
+	"github.com/arschles/eiger/lib/util"
+	"github.com/arschles/eiger/lib/ws"
 	"github.com/codegangsta/cli"
 	"github.com/fsouza/go-dockerclient"
 	"log"
