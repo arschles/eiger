@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"github.com/arschles/eiger/lib/util"
 	"github.com/gorilla/mux"
-	"log"
 	"net/http"
 	"time"
+	"io"
+	"bytes"
 )
 
 func writeErr(err error, res http.ResponseWriter) {
@@ -20,16 +21,40 @@ func agentsFunc(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func readBytes(toRead int64, reader io.Reader) error {
+	buf := bytes.NewBuffer([]byte{})
+	n, err := io.Copy(buf, reader)
+	if toRead != n {
+		return fmt.Errorf("expected to read %d bytes, read %d", toRead, n)
+	}
+	return err
+}
+
 func heartbeatFunc(agents *Agents) func(*websocket.Conn) {
 	return func(ws *websocket.Conn) {
-		log.Printf("got heartbeat from %s", ws.Config().Origin)
-		agent := NewAgent(ws.Config().Origin, ws)
-		ch := make(chan Agent)
-		agents.Add(*agent, ch)
-		go func() {
-			removed := <-ch
-			util.LogWarnf("removed agent %s", removed.Origin)
-		}()
+		for {
+			err := readBytes(1, ws)
+			if err != nil {
+				util.LogWarnf("couldn't read from ws connection %s", ws)
+				continue
+			}
+			agent := NewAgent(ws.Config().Origin, ws)
+			//if the agent wasn't added we're already watching it
+			if !agents.Add(*agent) {
+				continue
+			}
+			//if the agent was added start watching it
+			go func(ws *websocket.Conn, agent Agent) {
+				for {
+					time.Sleep(agents.hb)
+					err := readBytes(1, ws)
+					if err != nil {
+						util.LogWarnf("removed agent %s", agent)
+						agents.Remove(agent)
+					}
+				}
+			}(ws, *agent)
+		}
 	}
 }
 

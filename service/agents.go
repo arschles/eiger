@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"github.com/arschles/eiger/lib/util"
 	"io"
 	"net/url"
 	"sync"
@@ -44,22 +42,15 @@ func NewAgents(agents *[]Agent, hb time.Duration) *Agents {
 }
 
 //Add adds an Agent to this set
-func (a *Agents) Add(agnt Agent, removedChan chan<- Agent) {
+func (a *Agents) Add(agnt Agent) bool {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
+	_, ok := a.agents[agnt]
+	if !ok {
+		return false
+	}
 	a.agents[agnt] = true
-	go func(agnt Agent, hb time.Duration, c chan<- Agent) {
-		for {
-			time.Sleep(hb)
-			buf := bytes.NewBuffer([]byte{})
-			n, err := io.Copy(buf, agnt.ReadWriter)
-			if n != 1 || err != nil || (len(buf.Bytes()) != 1 && buf.Bytes()[0] != util.HeartbeatByte) {
-				removedChan <- agnt
-				a.Remove(agnt)
-				return
-			}
-		}
-	}(agnt, a.hb, removedChan)
+	return true
 }
 
 //Remove removes the given agent from the internal set
