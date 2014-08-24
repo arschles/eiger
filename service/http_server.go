@@ -22,28 +22,13 @@ func agentsFunc(w http.ResponseWriter, r *http.Request) {
 
 func heartbeatFunc(agents *Agents) func(*websocket.Conn) {
 	return func(ws *websocket.Conn) {
-		for {
-			b := make([]byte, 1)
-			n, err := ws.Read(b)
-			if n == 1 {
-				continue
-			}
-			if err != nil {
-				log.Printf("%s", err)
-				return
-			}
-			if b[0] != util.HeartbeatByte {
-				log.Printf("heartbeat byte not received")
-			}
-
-		}
-		log.Printf("added agent %s", ws.Config().Origin)
+		log.Printf("got heartbeat from %s", ws.Config().Origin)
 		agent := NewAgent(ws.Config().Origin, ws)
 		ch := make(chan Agent)
 		agents.Add(*agent, ch)
 		go func() {
 			removed := <-ch
-			util.LogWarnf("agent %s removed", removed.Origin)
+			util.LogWarnf("removed agent %s", removed.Origin)
 		}()
 	}
 }
