@@ -27,10 +27,12 @@ func heartbeat(wsConn *websocket.Conn, interval time.Duration, diedCh chan<- boo
 	client := rpc.NewClientWithCodec(clientCodec)
 	for {
 		res := struct{}{}
-		rep := struct{}{}
+		rep := 1
 		err := client.Call("Handlers.Heartbeat", res, &rep)
 		if err != nil {
 			util.LogWarnf("error heartbeating: %s", err)
+		} else if rep != 0 {
+			util.LogWarnf("error heartbeating. expected return code was %d, not 0", rep)
 		}
 	}
 	diedCh <- true
