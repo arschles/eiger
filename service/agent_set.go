@@ -30,15 +30,15 @@ func NewAgentSet(agents *[]Agent) *AgentSet {
 }
 
 //Add adds an Agent to this set
-func (a *AgentSet) Add(agnt Agent) bool {
+func (a *AgentSet) Add(agent Agent) bool {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	_, ok := a.set[agnt]
+	_, ok := a.set[agent]
 	if !ok {
-		return false
+		a.set[agent] = true
+		return true
 	}
-	a.set[agnt] = true
-	return true
+	return false
 }
 
 //Remove removes the given agent from the internal set
