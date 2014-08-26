@@ -2,14 +2,47 @@ package main
 
 import (
 	"fmt"
-	"github.com/arschles/eiger/lib/cmd"
 	"github.com/arschles/eiger/lib/util"
 	"github.com/arschles/eiger/lib/ws"
 	"github.com/codegangsta/cli"
 	"github.com/fsouza/go-dockerclient"
 	"log"
 	"time"
+	"net/rpc"
+	"net/rpc/jsonrpc"
+	"code.google.com/p/go.net/websocket"
+	"os"
 )
+
+func serve(wsConn *websocket.Conn, dclient *docker.Client, diedCh chan<- error) {
+	handlers := NewHandlers(dclient)
+	server := rpc.NewServer()
+	server.Register(handlers)
+	serverCodec := jsonrpc.NewServerCodec(wsConn)
+	server.ServeCodec(serverCodec)
+	diedCh <- fmt.Errorf("server stopped serving")
+}
+
+func heartbeat(wsConn *websocket.Conn, interval time.Duration, diedCh chan<- error) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		diedCh <- err
+		return
+	}
+	clientCodec := jsonrpc.NewClientCodec(wsConn)
+	client := rpc.NewClientWithCodec(clientCodec)
+	for {
+		rep := 1
+		err := client.Call("Handlers.Heartbeat", hostname, &rep)
+		if err != nil {
+			util.LogWarnf("(error heartbeating) %s", err)
+		} else if rep != 0 {
+			util.LogWarnf("(error heartbeating) expected return code was %d, not 0", rep)
+		}
+		time.Sleep(interval)
+	}
+	diedCh <- fmt.Errorf("heartbeat loop stopped")
+}
 
 func agent(c *cli.Context) {
 	dclient, err := docker.NewClient(c.String("dockerhost"))
@@ -17,33 +50,29 @@ func agent(c *cli.Context) {
 		log.Fatal(err)
 	}
 
-	hbIntv := time.Millisecond * time.Duration(c.Int("heartbeat"))
-
 	host := c.String("host")
 	port := c.Int("port")
+	hbInterval := time.Duration(c.Int("heartbeat")) * time.Millisecond
 	socketUrl := fmt.Sprintf("ws://%s:%d/socket", host, port)
-	heartUrl := fmt.Sprintf("ws://%s:%d/heart", host, port)
 	origin := fmt.Sprintf("http://%s/", host)
 
 	log.Printf("dialing %s", socketUrl)
-	socketWs := ws.MustDial(socketUrl, origin)
-	log.Printf("dialing %s", heartUrl)
-	heartWs := ws.MustDial(heartUrl, origin)
+	wsConn := ws.MustDial(socketUrl, origin)
 
-	go heartbeater(heartWs, hbIntv)
+	serveDied := make(chan error)
+	go serve(wsConn, dclient, serveDied)
+	heartbeatDied := make(chan error)
+	go func() {
+		heartbeat(wsConn, hbInterval, heartbeatDied)
+	}()
 
 	for {
-		c, err := cmd.ReadCommand(socketWs)
-		if err != nil {
-			util.LogWarnf("reading a command: %s", err)
-			continue
+		select {
+		case err := <-serveDied:
+			log.Fatalf("(rpc server) %s", err)
+		case err := <-heartbeatDied:
+			util.LogWarnf("(heartbeat loop) %s", err)
+			go heartbeat(wsConn, hbInterval, heartbeatDied)
 		}
-		dispatch, ok := dispatchTable[c.Method]
-		if !ok {
-			go unknown(c, socketWs)
-			continue
-		}
-
-		go dispatch(c, socketWs, dclient)
 	}
 }

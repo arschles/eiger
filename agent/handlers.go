@@ -1,82 +1,45 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"github.com/arschles/eiger/lib/cmd"
 	"github.com/fsouza/go-dockerclient"
-	"io"
 )
 
-type Handler func(*cmd.Command, io.Writer, *docker.Client)
-
-var dispatchTable = map[string]Handler{
-	cmd.DockerListContainersMethod:  listContainers,
-	cmd.DockerVersionMethod:         version,
-	cmd.DockerCreateContainerMethod: createContainer,
+type Handlers struct {
+	dclient *docker.Client
 }
 
-func unknown(c *cmd.Command, writer io.Writer) {
-	c.WriteError(fmt.Errorf(cmd.UnknownMethod), writer)
+func NewHandlers(d *docker.Client) *Handlers {
+	return &Handlers{d}
 }
 
-func version(c *cmd.Command, writer io.Writer, d *docker.Client) {
-	env, err := d.Version()
-	if err != nil {
-		c.WriteError(err, writer)
-		return
-	}
-	c.WriteResult(env, nil, writer)
+func (h *Handlers) Heartbeat(_ struct{}, reply *int) error {
+	*reply = 0
+	return nil
 }
 
-func listContainers(c *cmd.Command, writer io.Writer, d *docker.Client) {
-	opts_string, ok := c.Params["opts_json"]
-	if !ok {
-		c.WriteError(fmt.Errorf("no opts_json field found"), writer)
-		return
-	}
-
-	opts := docker.ListContainersOptions{}
-	err := json.Unmarshal([]byte(opts_string), &opts)
+func (h *Handlers) ListContainers(opts docker.ListContainersOptions, reply *[]docker.APIContainers) error {
+	containers, err := h.dclient.ListContainers(opts)
 	if err != nil {
-		c.WriteError(err, writer)
-		return
+		return err
 	}
-
-	containers, err := d.ListContainers(opts)
-	if err != nil {
-		c.WriteError(err, writer)
-		return
-	}
-	c.WriteResult(containers, nil, writer)
+	*reply = containers
+	return nil
 }
 
-func createContainer(c *cmd.Command, writer io.Writer, d *docker.Client) {
-	name, ok := c.Params["name"]
-	if !ok {
-		c.WriteError(fmt.Errorf("no name field found"), writer)
-		return
-	}
-	opts_string, ok := c.Params["config_json"]
-	if !ok {
-		c.WriteError(fmt.Errorf("no config_json field found"), writer)
-		return
-	}
-	conf := docker.Config{}
-	err := json.Unmarshal([]byte(opts_string), &conf)
+func (h *Handlers) Version(a struct{}, reply *docker.Env) error {
+	env, err := h.dclient.Version()
 	if err != nil {
-		c.WriteError(err, writer)
-		return
+		return err
 	}
-	opts := docker.CreateContainerOptions{
-		Name:   name,
-		Config: &conf,
-	}
+	*reply = *env
+	return nil
+}
 
-	container, err := d.CreateContainer(opts)
+func (h *Handlers) CreateContainer(opts docker.CreateContainerOptions, reply *docker.Container) error {
+	container, err := h.dclient.CreateContainer(opts)
 	if err != nil {
-		c.WriteError(err, writer)
-		return
+		return err
 	}
-	c.WriteResult(container, nil, writer)
+	*reply = *container
+	return nil
 }

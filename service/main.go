@@ -1,24 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"github.com/codegangsta/cli"
-	"log"
-	"net/http"
 	"os"
-	"time"
 )
-
-func run(c *cli.Context) {
-	ip := c.String("ip")
-	port := c.Int("port")
-	serveStr := fmt.Sprintf("%s:%d", ip, port)
-	log.Printf("eiger-service listening on %s", serveStr)
-
-	dur := time.Duration(c.Int("heartbeat")) * time.Millisecond
-	router := router(dur)
-	log.Fatal(http.ListenAndServe(serveStr, router))
-}
 
 func main() {
 	app := cli.NewApp()
@@ -45,6 +30,6 @@ func main() {
 		},
 	}
 	app.Version = "0.1.0"
-	app.Action = run
+	app.Action = service
 	app.Run(os.Args)
 }
