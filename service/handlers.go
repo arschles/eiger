@@ -9,15 +9,17 @@ import (
 
 type Handlers struct {
     set *AgentSet
+    connLookup *ConnLookup
     heartbeat time.Duration
     //channel to signal to start watching an agent
     watchCh chan Agent
     tickCh chan Agent
 }
 
-func NewHandlers(set *AgentSet, hb time.Duration) *Handlers {
+func NewHandlers(set *AgentSet, connLookup *ConnLookup, hb time.Duration) *Handlers {
     h := Handlers {
         set: set,
+        connLookup: connLookup,
         heartbeat: hb,
         watchCh: make(chan Agent),
         tickCh: make(chan Agent),
@@ -68,6 +70,7 @@ func (h *Handlers) tickLoop() {
 func (h *Handlers) Heartbeat(host string, rep *int) error {
     *rep = 0
     agent := NewAgent(host)
+    h.connLookup.Match(agent)
     added := h.set.Add(agent)
     if added {
         log.Printf("added agent %s to alive set", agent)

@@ -12,11 +12,20 @@ import (
     "github.com/gorilla/mux"
 )
 
-type socketHandler struct {
+type SocketHandler struct {
     rpcServer *rpc.Server
+    connLookup *ConnLookup
+}
+
+func NewSocketHandler(rpcServer *rpc.Server, connLookup *ConnLookup) *SocketHandler) {
+    return &SocketHandler{
+        rpcServer: rpcServer,
+        connLookup: connLookup,
+    }
 }
 
 func (h *socketHandler) serve(wsConn *websocket.Conn) {
+    connLookup.AddUnmatched(wsConn)
     serverCodec := jsonrpc.NewServerCodec(wsConn)
     h.rpcServer.ServeCodec(serverCodec)
 }
@@ -30,10 +39,12 @@ func service(c *cli.Context) {
     heartbeat := time.Duration(c.Int("heartbeat")) * time.Millisecond
 
     set := NewAgentSet(&[]Agent{})
+    connLookup := NewConnLookup()
+    handlers := NewHandlers(set, connLookup, heartbeat)
 
     rpcServer := rpc.NewServer()
-    rpcServer.Register(NewHandlers(set, heartbeat))
-    sockHandler := socketHandler{rpcServer}
+    rpcServer.Register(handlers)
+    sockHandler := NewSocketHandler(rpcServer, connLookup)
 
     router := mux.NewRouter()
     //REST verbs
