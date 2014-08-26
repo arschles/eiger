@@ -2,16 +2,14 @@ package main
 
 import (
 	"sync"
-	"time"
-	"code.google.com/p/go-uuid/uuid"
 )
 
 //Agent is the full representation of an agent, including the io.Writer
 //that can be used to communicate with the agent
 type Agent string
 
-func NewAgent() Agent {
-	return Agent(uuid.New())
+func NewAgent(name string) Agent {
+	return Agent(name)
 }
 
 //Agents represents a set of agents, each of which must have a heartbeat on its
@@ -19,17 +17,15 @@ func NewAgent() Agent {
 type AgentSet struct {
 	set map[Agent]bool
 	mutex  sync.RWMutex //protects set
-	hb     time.Duration
 }
 
-func NewAgentSet(agents *[]Agent, hb time.Duration) *AgentSet {
+func NewAgentSet(agents *[]Agent) *AgentSet {
 	m := map[Agent]bool{}
 	for _, a := range *agents {
 		m[a] = true
 	}
 	return &AgentSet{
 		set: m,
-		hb:     hb,
 	}
 }
 

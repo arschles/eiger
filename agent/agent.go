@@ -11,31 +11,37 @@ import (
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"code.google.com/p/go.net/websocket"
+	"os"
 )
 
-func serve(wsConn *websocket.Conn, dclient *docker.Client, diedCh chan<- bool) {
+func serve(wsConn *websocket.Conn, dclient *docker.Client, diedCh chan<- error) {
 	handlers := NewHandlers(dclient)
 	server := rpc.NewServer()
 	server.Register(handlers)
 	serverCodec := jsonrpc.NewServerCodec(wsConn)
 	server.ServeCodec(serverCodec)
-	diedCh <- true
+	diedCh <- fmt.Errorf("server stopped serving")
 }
 
-func heartbeat(wsConn *websocket.Conn, interval time.Duration, diedCh chan<- bool) {
+func heartbeat(wsConn *websocket.Conn, interval time.Duration, diedCh chan<- error) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		diedCh <- err
+		return
+	}
 	clientCodec := jsonrpc.NewClientCodec(wsConn)
 	client := rpc.NewClientWithCodec(clientCodec)
 	for {
-		res := struct{}{}
 		rep := 1
-		err := client.Call("Handlers.Heartbeat", res, &rep)
+		err := client.Call("Handlers.Heartbeat", hostname, &rep)
 		if err != nil {
-			util.LogWarnf("error heartbeating: %s", err)
+			util.LogWarnf("(error heartbeating) %s", err)
 		} else if rep != 0 {
-			util.LogWarnf("error heartbeating. expected return code was %d, not 0", rep)
+			util.LogWarnf("(error heartbeating) expected return code was %d, not 0", rep)
 		}
+		time.Sleep(interval)
 	}
-	diedCh <- true
+	diedCh <- fmt.Errorf("heartbeat loop stopped")
 }
 
 func agent(c *cli.Context) {
@@ -53,17 +59,19 @@ func agent(c *cli.Context) {
 	log.Printf("dialing %s", socketUrl)
 	wsConn := ws.MustDial(socketUrl, origin)
 
-	serveDied := make(chan bool)
+	serveDied := make(chan error)
 	go serve(wsConn, dclient, serveDied)
-	heartbeatDied := make(chan bool)
-	go heartbeat(wsConn, hbInterval, heartbeatDied)
+	heartbeatDied := make(chan error)
+	go func() {
+		heartbeat(wsConn, hbInterval, heartbeatDied)
+	}()
 
 	for {
 		select {
-		case <-serveDied:
-			log.Fatal("agent server died")
-		case <-heartbeatDied:
-			util.LogWarnf("heartbeat producer died, restarting")
+		case err := <-serveDied:
+			log.Fatalf("(rpc server) %s", err)
+		case err := <-heartbeatDied:
+			util.LogWarnf("(heartbeat loop) %s", err)
 			go heartbeat(wsConn, hbInterval, heartbeatDied)
 		}
 	}

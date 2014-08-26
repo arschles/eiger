@@ -27,12 +27,12 @@ func service(c *cli.Context) {
     serveStr := fmt.Sprintf("%s:%d", ip, port)
     log.Printf("eiger-service listening on %s", serveStr)
 
-    dur := time.Duration(c.Int("heartbeat")) * time.Millisecond
+    heartbeat := time.Duration(c.Int("heartbeat")) * time.Millisecond
 
-    set := NewAgentSet(&[]Agent{}, dur)
+    set := NewAgentSet(&[]Agent{})
 
     rpcServer := rpc.NewServer()
-    rpcServer.Register(NewHandlers(set))
+    rpcServer.Register(NewHandlers(set, heartbeat))
     sockHandler := socketHandler{rpcServer}
 
     router := mux.NewRouter()
@@ -45,33 +45,3 @@ func service(c *cli.Context) {
     //listen on websocket
     log.Fatal(http.ListenAndServe(serveStr, router))
 }
-
-// func writeErr(err error, res http.ResponseWriter) {
-// 	res.WriteHeader(http.StatusInternalServerError)
-// 	body := fmt.Sprintf(`{"error":"%s"}`, err.Error())
-// 	res.Write([]byte(body))
-// }
-
-// func heartbeatFunc(agents *Agents) func(*websocket.Conn) {
-// 	return func(ws *websocket.Conn) {
-// 		agent := NewAgent()
-// 		if !agents.Add(agent) {
-// 			return
-// 		}
-// 		ch := make(chan string)
-// 		ws.SetPingHandler(func(s string) error {
-// 			ch <- s
-// 			return nil
-// 		})
-// 		go func() {
-// 			for {
-// 				select {
-// 				case <-ch:
-// 				case <-time.After(agents.hb):
-// 					util.LogWarnf("didn't receive heartbeat in %s from agent %s. removing agent", agents.hb, agent)
-// 					return
-// 				}
-// 			}
-// 		}()
-// 	}
-// }
