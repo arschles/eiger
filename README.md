@@ -1,3 +1,3 @@
 # Eiger
 
-Docker orchestration as a service
+Docker command and control center
