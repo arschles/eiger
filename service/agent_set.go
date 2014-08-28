@@ -4,12 +4,19 @@ import (
 	"sync"
 )
 
+//Host is a representation of a hostname
+type Host string
+
 //Agent is the full representation of an agent, including the io.Writer
 //that can be used to communicate with the agent
 type Agent string
 
 func NewAgent(name string) Agent {
 	return Agent(name)
+}
+
+func (a *Agent) Host() Host {
+	return a
 }
 
 //Agents represents a set of agents, each of which must have a heartbeat on its

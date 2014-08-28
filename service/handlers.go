@@ -70,7 +70,7 @@ func (h *Handlers) tickLoop() {
 func (h *Handlers) Heartbeat(host string, rep *int) error {
     *rep = 0
     agent := NewAgent(host)
-    h.connLookup.Match(agent)
+    h.connLookup.Match(Host(agent))
     added := h.set.Add(agent)
     if added {
         log.Printf("added agent %s to alive set", agent)
