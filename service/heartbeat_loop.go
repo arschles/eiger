@@ -33,7 +33,7 @@ func (h *HeartbeatLoop) agentWatcher(agent *Agent, ticker <-chan bool) {
       select {
       case <-ticker:
           if time.Since(start) > h.hbDur * 4 {
-              util.LogWarnf("(late heartbeat) removing agent %s from alive set", agent)
+              util.LogWarnf("(late heartbeat) removing agent %s from alive set", *agent)
               h.lookup.Remove(agent)
               return
           }
