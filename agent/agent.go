@@ -23,27 +23,6 @@ func serve(wsConn *websocket.Conn, dclient *docker.Client, diedCh chan<- error) 
 	diedCh <- fmt.Errorf("server stopped serving")
 }
 
-func heartbeat(wsConn *websocket.Conn, interval time.Duration, diedCh chan<- error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		diedCh <- err
-		return
-	}
-	clientCodec := jsonrpc.NewClientCodec(wsConn)
-	client := rpc.NewClientWithCodec(clientCodec)
-	for {
-		rep := 1
-		err := client.Call("Handlers.Heartbeat", hostname, &rep)
-		if err != nil {
-			util.LogWarnf("(error heartbeating) %s", err)
-		} else if rep != 0 {
-			util.LogWarnf("(error heartbeating) expected return code was %d, not 0", rep)
-		}
-		time.Sleep(interval)
-	}
-	diedCh <- fmt.Errorf("heartbeat loop stopped")
-}
-
 func agent(c *cli.Context) {
 	dclient, err := docker.NewClient(c.String("dockerhost"))
 	if err != nil {
@@ -61,10 +40,9 @@ func agent(c *cli.Context) {
 
 	serveDied := make(chan error)
 	go serve(wsConn, dclient, serveDied)
+
 	heartbeatDied := make(chan error)
-	go func() {
-		heartbeat(wsConn, hbInterval, heartbeatDied)
-	}()
+	go heartbeat(wsConn, hbInterval, heartbeatDied)
 
 	for {
 		select {
