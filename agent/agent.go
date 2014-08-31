@@ -11,7 +11,6 @@ import (
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"code.google.com/p/go.net/websocket"
-	"os"
 )
 
 func serve(wsConn *websocket.Conn, dclient *docker.Client, diedCh chan<- error) {
@@ -42,7 +41,7 @@ func agent(c *cli.Context) {
 	go serve(wsConn, dclient, serveDied)
 
 	heartbeatDied := make(chan error)
-	go heartbeat(wsConn, hbInterval, heartbeatDied)
+	go heartbeatLoop(wsConn, hbInterval, heartbeatDied)
 
 	for {
 		select {
@@ -50,7 +49,7 @@ func agent(c *cli.Context) {
 			log.Fatalf("(rpc server) %s", err)
 		case err := <-heartbeatDied:
 			util.LogWarnf("(heartbeat loop) %s", err)
-			go heartbeat(wsConn, hbInterval, heartbeatDied)
+			go heartbeatLoop(wsConn, hbInterval, heartbeatDied)
 		}
 	}
 }
