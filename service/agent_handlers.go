@@ -7,7 +7,7 @@ import (
 )
 
 
-type Handlers struct {
+type AgentHandlers struct {
     set *AgentSet
     heartbeat time.Duration
     //channel to signal to start watching an agent
@@ -15,7 +15,7 @@ type Handlers struct {
     tickCh chan Agent
 }
 
-func NewHandlers(set *AgentSet, hb time.Duration) *Handlers {
+func NewAgentHandlers(set *AgentSet, hb time.Duration) *AgentHandlers {
     h := Handlers {
         set: set,
         heartbeat: hb,
@@ -26,7 +26,7 @@ func NewHandlers(set *AgentSet, hb time.Duration) *Handlers {
     return &h
 }
 
-func (h *Handlers) tickLoop() {
+func (h *AgentHandlers) tickLoop() {
 
     watchAgent := func(agent Agent, ticker <-chan bool) {
         for {
@@ -65,7 +65,7 @@ func (h *Handlers) tickLoop() {
     }
 }
 
-func (h *Handlers) Heartbeat(host string, rep *int) error {
+func (h *AgentHandlers) Heartbeat(host string, rep *int) error {
     *rep = 0
     agent := NewAgent(host)
     added := h.set.Add(agent)

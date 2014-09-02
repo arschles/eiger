@@ -21,6 +21,14 @@ func (h *socketHandler) serve(wsConn *websocket.Conn) {
     h.rpcServer.ServeCodec(serverCodec)
 }
 
+type heartbeatHandler struct {
+    agentSet AgentSet
+}
+
+func (h *heartbeatHandler) serve(wsConn *websocket.Conn) {
+    //TODO: add to agent set
+}
+
 func service(c *cli.Context) {
     ip := c.String("ip")
     port := c.Int("port")
