@@ -15,10 +15,8 @@ func NewHeartbeatLoop(l *AgentLookup, hbDur time.Duration) *HeartbeatLoop {
     notifyCh := make(chan Agent)
     loop := HeartbeatLoop{l, hbDur, notifyCh}
 
-    watchCh := make(chan Agent)
-    tickCh := make(chan Agent)
-    go loop.run(watchCh, tickCh)
-    
+    go loop.run()
+
     return &loop
 }
 
@@ -40,25 +38,24 @@ func (h *HeartbeatLoop) agentWatcher(agent Agent, ticker <-chan bool) {
           }
       case <-time.After(h.hbDur * 2):
           util.LogWarnf("(heartbeat timeout) removing agent %s from alive set", agent)
+          h.lookup.Remove(agent)
           return
       }
   }
 }
 
-func (h *HeartbeatLoop) run(watchCh chan Agent, tickCh chan Agent) {
+func (h *HeartbeatLoop) run() {
     tickers := map[Agent]chan bool{}
     for {
         select {
-        case agent := <-watchCh:
-            tickerCh := make(chan bool)
-            tickers[agent] = tickerCh
-            go h.agentWatcher(agent, tickerCh)
-        case agent := <-tickCh:
+        case agent := <-h.notifyCh:
             tickerCh, ok := tickers[agent]
             if !ok {
-                util.LogWarnf("could not find ticker channel for agent %s", agent)
-                continue
+                t := make(chan bool)
+                tickers[agent] = t
+                tickerCh = t
             }
+            go h.agentWatcher(agent, tickerCh)
             go func() {
                 tickerCh <- true
             }()
