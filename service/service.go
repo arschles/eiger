@@ -12,13 +12,13 @@ import (
     "github.com/arschles/eiger/lib/util"
 )
 
-type socketHandler struct {
+type heartbeatHandler struct {
     lookup *AgentLookup
     hbLoop *HeartbeatLoop
 }
 
 
-func (h *socketHandler) serve(wsConn *websocket.Conn) {
+func (h *heartbeatHandler) serve(wsConn *websocket.Conn) {
     for {
         //TODO: have the heartbeat loop communicate back when the agent is dead
         hbMsg, err := heartbeat.DecodeMessage(wsConn)
@@ -32,6 +32,16 @@ func (h *socketHandler) serve(wsConn *websocket.Conn) {
     }
 }
 
+type dockerEventsHandler struct {
+
+}
+
+func (d *dockerEventsHandler) serve(wsConn *websocket.Conn) {
+    for {
+        //websocket.JSON.Receive(wsConn, dockerEvent)
+    }
+}
+
 func service(c *cli.Context) {
     ip := c.String("ip")
     port := c.Int("port")
@@ -42,14 +52,15 @@ func service(c *cli.Context) {
     set := NewAgentLookup(&[]Agent{})
     hbLoop := NewHeartbeatLoop(set, hbDur)
 
-    socketHandler := socketHandler{set, hbLoop}
+    hbHandler := heartbeatHandler{set, hbLoop}
+    dockerEvtsHandler := dockerEventsHandler{}
 
     router := mux.NewRouter()
     //REST verbs
     //r.HandleFunc("/agents", agentsFunc).Methods("GET")
 
-    //Socket verb
-    router.Handle("/socket", websocket.Handler(socketHandler.serve))
+    router.Handle("/heartbeat", websocket.Handler(hbHandler.serve))
+    router.Handle("/docker_events", websocket.Handler(dockerEvtsHandler.serve))
 
     //listen on websocket
     log.Fatal(http.ListenAndServe(serveStr, router))

@@ -7,7 +7,6 @@ import (
     "fmt"
     "github.com/arschles/eiger/lib/util"
     "strconv"
-    "log"
 )
 
 //HeartbeatMessage is an encoding.BinaryMarshaler that generates heartbeat

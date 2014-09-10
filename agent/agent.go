@@ -32,11 +32,11 @@ func agent(c *cli.Context) {
 	host := c.String("host")
 	port := c.Int("port")
 	hbInterval := time.Duration(c.Int("heartbeat")) * time.Millisecond
-	socketUrl := fmt.Sprintf("ws://%s:%d/socket", host, port)
+	heartbeatUrl := fmt.Sprintf("ws://%s:%d/heartbeat", host, port)
 	origin := fmt.Sprintf("http://%s/", host)
 
-	log.Printf("dialing %s", socketUrl)
-	wsConn, err := websocket.Dial(socketUrl, "", origin)
+	log.Printf("dialing %s", heartbeatUrl)
+	wsConn, err := websocket.Dial(heartbeatUrl, "", origin)
 	if err != nil {
 		log.Fatalf("(websocket connection) %s", err)
 	}
