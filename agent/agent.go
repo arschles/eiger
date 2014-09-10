@@ -10,6 +10,39 @@ import (
 	"time"
 )
 
+func dialOrDie(url string, origin string) *websocket.Conn {
+	log.Printf("dialing %s", url)
+	conn, err := websocket.Dial(url, "", origin)
+	if err != nil {
+		log.Fatalf("(websocket connection) %s", err)
+	}
+	return conn
+}
+
+func startRpc(origin string, host string, port int, dclient *docker.Client) <-chan error {
+	rpcConn := dialOrDie(fmt.Sprintf("ws://%s:%d/rpc", host, port), origin)
+	serveDied := make(chan error)
+	go rpcLoop(rpcConn, dclient, serveDied)
+	log.Printf("started RPC server")
+	return serveDied
+}
+
+func startHb(origin string, host string, port int, interval time.Duration) <-chan error {
+	heartbeatDied := make(chan error)
+	hbConn := dialOrDie(fmt.Sprintf("ws://%s:%d/heartbeat", host, port), origin)
+	go heartbeatLoop(hbConn, interval, heartbeatDied)
+	log.Printf("started heartbeat loop")
+	return heartbeatDied
+}
+
+func startDocker(origin string, host string, port int, client *docker.Client) <-chan error {
+	dockerConn := dialOrDie(fmt.Sprintf("ws://%s:%s/docker", host, port), origin)
+	dockerCh := make(chan error)
+	go dockerLoop(dockerConn, client, dockerCh)
+	log.Printf("started logs loop")
+	return dockerCh
+}
+
 func agent(c *cli.Context) {
 	dclient, err := docker.NewClient(c.String("dockerhost"))
 	if err != nil {
@@ -19,37 +52,22 @@ func agent(c *cli.Context) {
 	host := c.String("host")
 	port := c.Int("port")
 	hbInterval := time.Duration(c.Int("heartbeat")) * time.Millisecond
-	heartbeatUrl := fmt.Sprintf("ws://%s:%d/heartbeat", host, port)
 	origin := fmt.Sprintf("http://%s/", host)
 
-	log.Printf("dialing %s", heartbeatUrl)
-	wsConn, err := websocket.Dial(heartbeatUrl, "", origin)
-	if err != nil {
-		log.Fatalf("(websocket connection) %s", err)
-	}
-
-	serveDied := make(chan error)
-	go rpcLoop(wsConn, dclient, serveDied)
-	log.Printf("started RPC server")
-
-	heartbeatDied := make(chan error)
-	go heartbeatLoop(wsConn, hbInterval, heartbeatDied)
-	log.Printf("started heartbeat loop")
-
-	logsDied := make(chan error)
-	go logsLoop(wsConn, dclient, logsDied)
-	log.Printf("started logs loop")
+	rpcDied := startRpc(origin, host, port, dclient)
+	hbDied := startHb(origin, host, port, hbInterval)
+	dockerDied := startDocker(origin, host, port, dclient)
 
 	for {
 		select {
-		case err := <-serveDied:
+		case err := <-rpcDied:
 			log.Fatalf("(rpc server) %s", err)
-		case err := <-heartbeatDied:
+		case err := <-hbDied:
 			util.LogWarnf("(heartbeat loop) %s", err)
-			go heartbeatLoop(wsConn, hbInterval, heartbeatDied)
-		case err := <-logsDied:
-			util.LogWarnf("(logs loop) %s", err)
-			go logsLoop(wsConn, dclient, logsDied)
+			hbDied = startHb(origin, host, port, hbInterval)
+		case err := <-dockerDied:
+			util.LogWarnf("(docker loop) %s", err)
+			dockerDied = startDocker(origin, host, port, dclient)
 		}
 	}
 }

@@ -5,6 +5,6 @@ import (
 	"github.com/fsouza/go-dockerclient"
 )
 
-func logsLoop(ws *websocket.Conn, dockerClient *docker.Client, diedCh chan<- error) {
+func dockerLoop(ws *websocket.Conn, dockerClient *docker.Client, diedCh chan<- error) {
 
 }
