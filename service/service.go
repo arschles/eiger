@@ -41,6 +41,16 @@ func (d *dockerEventsHandler) serve(wsConn *websocket.Conn) {
 	}
 }
 
+type rpcHandler struct {
+
+}
+
+func (r *rpcHandler) serve(ws *websocket.Conn) {
+	for {
+		//websocket.JSON.Receive(wsConn, rpcMethod)
+	}
+}
+
 func service(c *cli.Context) {
 	ip := c.String("ip")
 	port := c.Int("port")
@@ -53,6 +63,7 @@ func service(c *cli.Context) {
 
 	hbHandler := heartbeatHandler{set, hbLoop}
 	dockerEvtsHandler := dockerEventsHandler{}
+	rpcHandler := rpcHandler{}
 
 	router := mux.NewRouter()
 	//REST verbs
@@ -60,6 +71,7 @@ func service(c *cli.Context) {
 
 	router.Handle("/heartbeat", websocket.Handler(hbHandler.serve))
 	router.Handle("/docker_events", websocket.Handler(dockerEvtsHandler.serve))
+	router.Handle("/rpc", websocket.Handler(rpcHandler.serve))
 
 	//listen on websocket
 	log.Fatal(http.ListenAndServe(serveStr, router))

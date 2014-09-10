@@ -28,8 +28,8 @@ func startRpc(origin string, host string, port int, dclient *docker.Client) <-ch
 }
 
 func startHb(origin string, host string, port int, interval time.Duration) <-chan error {
-	heartbeatDied := make(chan error)
 	hbConn := dialOrDie(fmt.Sprintf("ws://%s:%d/heartbeat", host, port), origin)
+	heartbeatDied := make(chan error)
 	go heartbeatLoop(hbConn, interval, heartbeatDied)
 	log.Printf("started heartbeat loop")
 	return heartbeatDied

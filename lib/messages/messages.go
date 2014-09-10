@@ -11,6 +11,7 @@ type Heartbeat struct {
 }
 
 type DockerEvent struct {
+  //TODO: fill in
 }
 
 type DockerLog struct {
@@ -20,4 +21,5 @@ type DockerLog struct {
 }
 
 type DockerStatus struct {
+  //TODO: fill in
 }
