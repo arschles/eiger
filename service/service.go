@@ -8,7 +8,7 @@ import (
     "time"
     "code.google.com/p/go.net/websocket"
     "github.com/gorilla/mux"
-    "github.com/arschles/eiger/lib/heartbeat"
+    "github.com/arschles/eiger/lib/messages"
     "github.com/arschles/eiger/lib/util"
 )
 
@@ -20,8 +20,9 @@ type heartbeatHandler struct {
 
 func (h *heartbeatHandler) serve(wsConn *websocket.Conn) {
     for {
-        //TODO: have the heartbeat loop communicate back when the agent is dead
-        hbMsg, err := heartbeat.DecodeMessage(wsConn)
+      //TODO: have the heartbeat loop communicate back when the agent is dead
+      hbMsg := messages.Heartbeat{}
+      err := websocket.JSON.Receive(wsConn, &hbMsg)
         if err != nil {
             util.LogWarnf("(parsing heartbeat message) %s", err)
             return

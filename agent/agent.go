@@ -7,21 +7,8 @@ import (
 	"github.com/fsouza/go-dockerclient"
 	"log"
 	"time"
-	"net/rpc"
-	"net/rpc/jsonrpc"
 	"code.google.com/p/go.net/websocket"
 )
-
-func serve(wsConn *websocket.Conn, dclient *docker.Client, diedCh chan<- error) {
-	handlers := NewHandlers(dclient)
-	server := rpc.NewServer()
-	server.Register(handlers)
-	serverCodec := jsonrpc.NewServerCodec(wsConn)
-	for {
-		server.ServeCodec(serverCodec)
-	}
-	diedCh <- fmt.Errorf("server stopped serving")
-}
 
 func agent(c *cli.Context) {
 	dclient, err := docker.NewClient(c.String("dockerhost"))
@@ -42,13 +29,16 @@ func agent(c *cli.Context) {
 	}
 
 	serveDied := make(chan error)
-	go serve(wsConn, dclient, serveDied)
+	go rpcLoop(wsConn, dclient, serveDied)
 	log.Printf("started RPC server")
 
 	heartbeatDied := make(chan error)
 	go heartbeatLoop(wsConn, hbInterval, heartbeatDied)
 	log.Printf("started heartbeat loop")
 
+	logsDied := make(chan error)
+	go logsLoop(wsConn, logsDied)
+	log.Printf("started logs loop")
 
 	for {
 		select {
@@ -57,6 +47,9 @@ func agent(c *cli.Context) {
 		case err := <-heartbeatDied:
 			util.LogWarnf("(heartbeat loop) %s", err)
 			go heartbeatLoop(wsConn, hbInterval, heartbeatDied)
+		case err := <- logsDied:
+			util.LogWarnf("(logs loop) %s", err)
+			go logsLoop(wsConn, logsDied)
 		}
 	}
 }
