@@ -7,18 +7,30 @@ import (
     "net/http"
     "time"
     "code.google.com/p/go.net/websocket"
-    "net/rpc"
-    "net/rpc/jsonrpc"
     "github.com/gorilla/mux"
+    "github.com/arschles/eiger/lib/heartbeat"
+    "github.com/arschles/eiger/lib/util"
 )
 
 type socketHandler struct {
-    rpcServer *rpc.Server
+    lookup *AgentLookup
+    hbLoop *HeartbeatLoop
 }
 
+
 func (h *socketHandler) serve(wsConn *websocket.Conn) {
-    serverCodec := jsonrpc.NewServerCodec(wsConn)
-    h.rpcServer.ServeCodec(serverCodec)
+    for {
+        //TODO: have the heartbeat loop communicate back when the agent is dead
+        hbMsg, err := heartbeat.DecodeMessage(wsConn)
+        if err != nil {
+            util.LogWarnf("(parsing heartbeat message) %s", err)
+            return
+        }
+        newAgent := NewAgent(hbMsg.Hostname, wsConn)
+        log.Printf("got agent %s", *newAgent)
+        agent := h.lookup.GetOrAdd(*newAgent)
+        h.hbLoop.Notify(*agent)
+    }
 }
 
 func service(c *cli.Context) {
@@ -27,20 +39,18 @@ func service(c *cli.Context) {
     serveStr := fmt.Sprintf("%s:%d", ip, port)
     log.Printf("eiger-service listening on %s", serveStr)
 
-    heartbeat := time.Duration(c.Int("heartbeat")) * time.Millisecond
+    hbDur := time.Duration(c.Int("heartbeat")) * time.Millisecond
+    set := NewAgentLookup(&[]Agent{})
+    hbLoop := NewHeartbeatLoop(set, hbDur)
 
-    set := NewAgentSet(&[]Agent{})
-
-    rpcServer := rpc.NewServer()
-    rpcServer.Register(NewHandlers(set, heartbeat))
-    sockHandler := socketHandler{rpcServer}
+    socketHandler := socketHandler{set, hbLoop}
 
     router := mux.NewRouter()
     //REST verbs
     //r.HandleFunc("/agents", agentsFunc).Methods("GET")
 
     //Socket verb
-    router.Handle("/socket", websocket.Handler(sockHandler.serve))
+    router.Handle("/socket", websocket.Handler(socketHandler.serve))
 
     //listen on websocket
     log.Fatal(http.ListenAndServe(serveStr, router))

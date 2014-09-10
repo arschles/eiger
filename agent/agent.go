@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"github.com/arschles/eiger/lib/util"
-	"github.com/arschles/eiger/lib/ws"
 	"github.com/codegangsta/cli"
 	"github.com/fsouza/go-dockerclient"
 	"log"
@@ -11,7 +10,6 @@ import (
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"code.google.com/p/go.net/websocket"
-	"os"
 )
 
 func serve(wsConn *websocket.Conn, dclient *docker.Client, diedCh chan<- error) {
@@ -19,35 +17,16 @@ func serve(wsConn *websocket.Conn, dclient *docker.Client, diedCh chan<- error) 
 	server := rpc.NewServer()
 	server.Register(handlers)
 	serverCodec := jsonrpc.NewServerCodec(wsConn)
-	server.ServeCodec(serverCodec)
-	diedCh <- fmt.Errorf("server stopped serving")
-}
-
-func heartbeat(wsConn *websocket.Conn, interval time.Duration, diedCh chan<- error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		diedCh <- err
-		return
-	}
-	clientCodec := jsonrpc.NewClientCodec(wsConn)
-	client := rpc.NewClientWithCodec(clientCodec)
 	for {
-		rep := 1
-		err := client.Call("Handlers.Heartbeat", hostname, &rep)
-		if err != nil {
-			util.LogWarnf("(error heartbeating) %s", err)
-		} else if rep != 0 {
-			util.LogWarnf("(error heartbeating) expected return code was %d, not 0", rep)
-		}
-		time.Sleep(interval)
+		server.ServeCodec(serverCodec)
 	}
-	diedCh <- fmt.Errorf("heartbeat loop stopped")
+	diedCh <- fmt.Errorf("server stopped serving")
 }
 
 func agent(c *cli.Context) {
 	dclient, err := docker.NewClient(c.String("dockerhost"))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("(docker connection) %s", err)
 	}
 
 	host := c.String("host")
@@ -57,14 +36,19 @@ func agent(c *cli.Context) {
 	origin := fmt.Sprintf("http://%s/", host)
 
 	log.Printf("dialing %s", socketUrl)
-	wsConn := ws.MustDial(socketUrl, origin)
+	wsConn, err := websocket.Dial(socketUrl, "", origin)
+	if err != nil {
+		log.Fatalf("(websocket connection) %s", err)
+	}
 
 	serveDied := make(chan error)
 	go serve(wsConn, dclient, serveDied)
+	log.Printf("started RPC server")
+
 	heartbeatDied := make(chan error)
-	go func() {
-		heartbeat(wsConn, hbInterval, heartbeatDied)
-	}()
+	go heartbeatLoop(wsConn, hbInterval, heartbeatDied)
+	log.Printf("started heartbeat loop")
+
 
 	for {
 		select {
@@ -72,7 +56,7 @@ func agent(c *cli.Context) {
 			log.Fatalf("(rpc server) %s", err)
 		case err := <-heartbeatDied:
 			util.LogWarnf("(heartbeat loop) %s", err)
-			go heartbeat(wsConn, hbInterval, heartbeatDied)
+			go heartbeatLoop(wsConn, hbInterval, heartbeatDied)
 		}
 	}
 }

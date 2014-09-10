@@ -24,3 +24,4 @@ _testmain.go
 .DS_Store
 agent/agent
 service/service
+_workspace
