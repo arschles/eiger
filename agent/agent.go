@@ -1,13 +1,13 @@
 package main
 
 import (
+	"code.google.com/p/go.net/websocket"
 	"fmt"
 	"github.com/arschles/eiger/lib/util"
 	"github.com/codegangsta/cli"
 	"github.com/fsouza/go-dockerclient"
 	"log"
 	"time"
-	"code.google.com/p/go.net/websocket"
 )
 
 func agent(c *cli.Context) {
@@ -37,7 +37,7 @@ func agent(c *cli.Context) {
 	log.Printf("started heartbeat loop")
 
 	logsDied := make(chan error)
-	go logsLoop(wsConn, logsDied)
+	go logsLoop(wsConn, dclient, logsDied)
 	log.Printf("started logs loop")
 
 	for {
@@ -47,9 +47,9 @@ func agent(c *cli.Context) {
 		case err := <-heartbeatDied:
 			util.LogWarnf("(heartbeat loop) %s", err)
 			go heartbeatLoop(wsConn, hbInterval, heartbeatDied)
-		case err := <- logsDied:
+		case err := <-logsDied:
 			util.LogWarnf("(logs loop) %s", err)
-			go logsLoop(wsConn, logsDied)
+			go logsLoop(wsConn, dclient, logsDied)
 		}
 	}
 }

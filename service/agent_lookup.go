@@ -1,15 +1,15 @@
 package main
 
 import (
-	"sync"
 	"io"
+	"sync"
 )
 
 //Agent is the full representation of an agent, including the io.Writer
 //that can be used to communicate with the agent
 type Agent struct {
 	Hostname string
-	Conn io.Writer
+	Conn     io.Writer
 }
 
 func NewAgent(hostname string, conn io.Writer) *Agent {
@@ -23,8 +23,8 @@ func (a Agent) String() string {
 //AgentLookup represents a set of agents, each of which must have a heartbeat on its
 //Writer. When the heartbeat fails, the agent is removed from the set
 type AgentLookup struct {
-	m map[string]Agent
-	mutex  sync.RWMutex //protects set
+	m     map[string]Agent
+	mutex sync.RWMutex //protects set
 }
 
 func NewAgentLookup(agents *[]Agent) *AgentLookup {
