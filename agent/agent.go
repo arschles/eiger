@@ -36,7 +36,7 @@ func startHb(origin string, host string, port int, interval time.Duration) <-cha
 }
 
 func startDocker(origin string, host string, port int, client *docker.Client) <-chan error {
-	dockerConn := dialOrDie(fmt.Sprintf("ws://%s:%s/docker", host, port), origin)
+	dockerConn := dialOrDie(fmt.Sprintf("ws://%s:%d/docker", host, port), origin)
 	dockerCh := make(chan error)
 	go dockerLoop(dockerConn, client, dockerCh)
 	log.Printf("started logs loop")

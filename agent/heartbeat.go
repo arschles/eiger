@@ -14,6 +14,9 @@ import (
 //TODO: make this configurable
 const HBMOD = 10
 
+//the number of consecutive heartbeat failures before dying
+const HBFAILTHRESH = 5
+
 func heartbeatLoop(wsConn *websocket.Conn, interval time.Duration, diedCh chan<- error) {
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -22,8 +25,14 @@ func heartbeatLoop(wsConn *websocket.Conn, interval time.Duration, diedCh chan<-
 	}
 
 	hbNum := 0
+	numFails := 0
+	lastFailed := false
 	for {
-		msg := messages.Heartbeat{hostname, time.Now()}
+		msg := messages.Heartbeat{
+			Hostname: hostname,
+			SendTime: time.Now(),
+		}
+
 		if hbNum%HBMOD == 0 {
 			log.Printf("sending heartbeat message %s (%d)", msg, hbNum)
 		}
@@ -33,9 +42,16 @@ func heartbeatLoop(wsConn *websocket.Conn, interval time.Duration, diedCh chan<-
 		//TODO: backoff or fail if the heartbeat loop keeps erroring
 		if err != nil {
 			util.LogWarnf("(error heartbeating) %s", err)
+			if lastFailed && numFails >= HBFAILTHRESH {
+				break
+			}
+			numFails++
+			lastFailed = true
 		}
 
 		time.Sleep(interval)
+		lastFailed = false
+		numFails = 0
 	}
 	diedCh <- fmt.Errorf("heartbeat loop stopped")
 }

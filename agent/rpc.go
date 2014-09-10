@@ -16,5 +16,4 @@ func rpcLoop(wsConn *websocket.Conn, dclient *docker.Client, diedCh chan<- error
 	for {
 		server.ServeCodec(serverCodec)
 	}
-	diedCh <- fmt.Errorf("server stopped serving")
 }
