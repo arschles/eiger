@@ -39,7 +39,7 @@ func startDocker(origin string, host string, port int, client *docker.Client) <-
 	dockerConn := dialOrDie(fmt.Sprintf("ws://%s:%d/docker", host, port), origin)
 	dockerCh := make(chan error)
 	go dockerLoop(dockerConn, client, dockerCh)
-	log.Printf("started logs loop")
+	log.Printf("started docker loop")
 	return dockerCh
 }
 

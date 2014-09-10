@@ -24,8 +24,8 @@ func main() {
 		},
 		cli.IntFlag{
 			Name:   "heartbeat,b",
-			Value:  1000,
-			Usage:  "the longest allowable latency between heartbeats",
+			Value:  2000,
+			Usage:  "the longest allowable latency between heartbeats, in milliseconds",
 			EnvVar: "EIGER_HEARTBEAT",
 		},
 	}

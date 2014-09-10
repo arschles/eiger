@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+//the multiplier for heartbeat duration. used to determine when a heartbeat
+//has timed out
+const HB_TIMEOUT_MULTIPLIER = 10
+
 type HeartbeatLoop struct {
 	lookup   *AgentLookup
 	hbDur    time.Duration
@@ -36,7 +40,7 @@ func (h *HeartbeatLoop) agentWatcher(agent Agent, ticker <-chan bool) {
 				h.lookup.Remove(agent)
 				return
 			}
-		case <-time.After(h.hbDur * 2):
+		case <-time.After(h.hbDur * HB_TIMEOUT_MULTIPLIER):
 			util.LogWarnf("(heartbeat timeout) removing agent %s from alive set", agent)
 			h.lookup.Remove(agent)
 			return

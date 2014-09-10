@@ -37,6 +37,7 @@ type dockerEventsHandler struct {
 
 func (d *dockerEventsHandler) serve(wsConn *websocket.Conn) {
 	for {
+		time.Sleep(1*time.Hour)
 		//websocket.JSON.Receive(wsConn, dockerEvent)
 	}
 }
@@ -47,16 +48,12 @@ type rpcHandler struct {
 
 func (r *rpcHandler) serve(ws *websocket.Conn) {
 	for {
+		time.Sleep(1*time.Hour)
 		//websocket.JSON.Receive(wsConn, rpcMethod)
 	}
 }
 
 func service(c *cli.Context) {
-	ip := c.String("ip")
-	port := c.Int("port")
-	serveStr := fmt.Sprintf("%s:%d", ip, port)
-	log.Printf("eiger-service listening on %s", serveStr)
-
 	hbDur := time.Duration(c.Int("heartbeat")) * time.Millisecond
 	set := NewAgentLookup(&[]Agent{})
 	hbLoop := NewHeartbeatLoop(set, hbDur)
@@ -70,9 +67,12 @@ func service(c *cli.Context) {
 	//r.HandleFunc("/agents", agentsFunc).Methods("GET")
 
 	router.Handle("/heartbeat", websocket.Handler(hbHandler.serve))
-	router.Handle("/docker_events", websocket.Handler(dockerEvtsHandler.serve))
+	router.Handle("/docker", websocket.Handler(dockerEvtsHandler.serve))
 	router.Handle("/rpc", websocket.Handler(rpcHandler.serve))
 
-	//listen on websocket
+	ip := c.String("ip")
+	port := c.Int("port")
+	serveStr := fmt.Sprintf("%s:%d", ip, port)
+	log.Printf("eiger-service listening on %s", serveStr)
 	log.Fatal(http.ListenAndServe(serveStr, router))
 }
