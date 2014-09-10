@@ -15,6 +15,7 @@ import (
 const HBMOD = 10
 
 //the number of consecutive heartbeat failures before dying
+//TODO: make this configurable
 const HBFAILTHRESH = 5
 
 func heartbeatLoop(wsConn *websocket.Conn, interval time.Duration, diedCh chan<- error) {
