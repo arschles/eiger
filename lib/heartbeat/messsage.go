@@ -29,7 +29,7 @@ func (h *Message) MarshalBinary() ([]byte, error) {
 
 //parseLen reads the first N bytes until the first '\n' byte and returns
 //those bytes parsed as an integer. returns 0 and the first error it finds.
-func parseLen(reader io.Reader) (int, int, error) {
+func parseLen(reader io.Reader) (int, error) {
     //read until '\n' byte
     bytes := []byte{}
     for {
@@ -38,15 +38,17 @@ func parseLen(reader io.Reader) (int, int, error) {
 
         if err != nil {
             return 0, err
-        } else if n <= 0 {
-            return 0, fmt.Errorf("parsed length was %d", n)
         }
 
-        if (n > 0 && b[0] == '\n') || n <= 0 {
-            break
+        if n > 0 {
+            if b[0] == '\n' {
+                break
+            } else {
+                bytes = append(bytes, b[0])
+            }
+        } else {
+            return 0, fmt.Errorf("(parsing heartbeat message length) parsed length was %d", n)
         }
-
-        bytes = append(bytes, b[0])
     }
 
     return strconv.Atoi(string(bytes))
@@ -68,8 +70,9 @@ func DecodeMessage(reader io.Reader) (*Message, error) {
     if n != numBytes {
         return nil, fmt.Errorf("expected to read %d bytes, but read %d", numBytes, n)
     }
+    log.Printf("read json: %s", string(bytes[3:]))
     msg := new(Message)
-    err = json.Unmarshal(bytes, msg)
+    err = json.Unmarshal(bytes[3:], msg)
     if err != nil {
         return nil, err
     }

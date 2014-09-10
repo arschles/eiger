@@ -7,6 +7,7 @@ import (
   "github.com/arschles/eiger/lib/util"
   "github.com/arschles/eiger/lib/heartbeat"
   "fmt"
+  "log"
 )
 
 func heartbeatLoop(wsConn *websocket.Conn, interval time.Duration, diedCh chan<- error) {
@@ -18,6 +19,7 @@ func heartbeatLoop(wsConn *websocket.Conn, interval time.Duration, diedCh chan<-
 
   for {
     msg := heartbeat.Message{hostname, time.Now()}
+    log.Printf("sending heartbeat message %s", msg)
     bytes, err := msg.MarshalBinary()
     //TODO: backoff or fail if the heartbeat loop keeps erroring
     if err != nil {
@@ -33,7 +35,6 @@ func heartbeatLoop(wsConn *websocket.Conn, interval time.Duration, diedCh chan<-
     if err != nil {
       util.LogWarnf("(error heartbeating) %s", err)
     }
-
     time.Sleep(interval)
   }
   diedCh <- fmt.Errorf("heartbeat loop stopped")

@@ -16,17 +16,21 @@ func NewAgent(hostname string, conn io.Writer) *Agent {
 	return &Agent{hostname, conn}
 }
 
-//Agents represents a set of agents, each of which must have a heartbeat on its
+func (a Agent) String() string {
+	return a.Hostname
+}
+
+//AgentLookup represents a set of agents, each of which must have a heartbeat on its
 //Writer. When the heartbeat fails, the agent is removed from the set
 type AgentLookup struct {
-	m map[string]*Agent
+	m map[string]Agent
 	mutex  sync.RWMutex //protects set
 }
 
 func NewAgentLookup(agents *[]Agent) *AgentLookup {
-	m := map[string]*Agent{}
+	m := map[string]Agent{}
 	for _, agent := range *agents {
-		m[agent.Hostname] = &agent
+		m[agent.Hostname] = agent
 	}
 	return &AgentLookup{
 		m: m,
@@ -34,19 +38,19 @@ func NewAgentLookup(agents *[]Agent) *AgentLookup {
 }
 
 //Add adds an Agent to this set
-func (a *AgentLookup) GetOrAdd(agent *Agent) *Agent {
+func (a *AgentLookup) GetOrAdd(agent Agent) *Agent {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 	existing, ok := a.m[agent.Hostname]
 	if !ok {
 		a.m[agent.Hostname] = agent
-		return agent
+		return &agent
 	}
-	return existing
+	return &existing
 }
 
 //Remove removes the given agent from the internal set
-func (a *AgentLookup) Remove(agnt *Agent) bool {
+func (a *AgentLookup) Remove(agnt Agent) bool {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 	_, ok := a.m[agnt.Hostname]

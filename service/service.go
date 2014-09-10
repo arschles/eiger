@@ -19,14 +19,18 @@ type socketHandler struct {
 
 
 func (h *socketHandler) serve(wsConn *websocket.Conn) {
-    hbMsg, err := heartbeat.DecodeMessage(wsConn)
-    if err != nil {
-        util.LogWarnf("(parsing heartbeat message) %s", err)
-        return
+    for {
+        //TODO: have the heartbeat loop communicate back when the agent is dead
+        hbMsg, err := heartbeat.DecodeMessage(wsConn)
+        if err != nil {
+            util.LogWarnf("(parsing heartbeat message) %s", err)
+            return
+        }
+        newAgent := NewAgent(hbMsg.Hostname, wsConn)
+        log.Printf("got agent %s", *newAgent)
+        agent := h.lookup.GetOrAdd(*newAgent)
+        h.hbLoop.Notify(*agent)
     }
-    newAgent := NewAgent(hbMsg.Hostname, wsConn)
-    agent := h.lookup.GetOrAdd(newAgent)
-    h.hbLoop.Notify(agent)
 }
 
 func service(c *cli.Context) {
