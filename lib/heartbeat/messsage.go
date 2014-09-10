@@ -61,7 +61,6 @@ func DecodeMessage(reader io.Reader) (*Message, error) {
     if err != nil {
         return nil, err
     }
-    log.Printf("attempting to read %d bytes", numBytes)
     bytes := make([]byte, numBytes)
     n, err := reader.Read(bytes)
     if err != nil {
@@ -70,7 +69,6 @@ func DecodeMessage(reader io.Reader) (*Message, error) {
     if n != numBytes {
         return nil, fmt.Errorf("expected to read %d bytes, but read %d", numBytes, n)
     }
-    log.Printf("read json: %s", string(bytes[3:]))
     msg := new(Message)
     err = json.Unmarshal(bytes[3:], msg)
     if err != nil {

@@ -27,7 +27,6 @@ func (h *socketHandler) serve(wsConn *websocket.Conn) {
             return
         }
         newAgent := NewAgent(hbMsg.Hostname, wsConn)
-        log.Printf("got agent %s", *newAgent)
         agent := h.lookup.GetOrAdd(*newAgent)
         h.hbLoop.Notify(*agent)
     }
