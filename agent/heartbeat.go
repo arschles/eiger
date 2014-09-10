@@ -25,7 +25,7 @@ func heartbeatLoop(wsConn *websocket.Conn, interval time.Duration, diedCh chan<-
   for {
     msg := messages.Heartbeat{hostname, time.Now()}
     if hbNum % HBMOD == 0 {
-      log.Printf("sending heartbeat message %s", msg)
+      log.Printf("sending heartbeat message %s (%d)", msg, hbNum)
     }
     hbNum++
 
