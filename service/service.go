@@ -31,35 +31,23 @@ func (h *socketHandler) serve(wsConn *websocket.Conn) {
 	iterNum := 0
 
 	for {
-		recvCh := make(chan heartbeat.Message)
-		errCh := make(chan error)
-		//TODO: have a way to kill this goroutine
-		go func() {
-			hbMsg, err := heartbeat.DecodeMessage(wsConn)
-			if err != nil {
-				errCh <- err
-				return
-			}
-			recvCh <- *hbMsg
-		}()
-
-		select {
-		case err := <-errCh:
+		hbMsg, err := heartbeat.DecodeMessage(wsConn)
+		if err != nil {
 			util.LogWarnf("(parsing heartbeat message) %s", err)
 			break
-		case recv := <-recvCh:
-			newAgent := NewAgent(recv.Hostname, wsConn)
-			agent := h.lookup.GetOrAdd(*newAgent)
-			if iterNum%HBMOD == 0 {
-				log.Printf("got agent heartbeat %s", *agent)
-			}
-			iterNum++
-			if time.Since(lastRecv) > (h.hbInterval * HBGRACEMULTIPLIER) {
-				util.LogWarnf("(late heartbeat) removing agent %s from alive set", *agent)
-				h.lookup.Remove(*agent)
-				break
-			}
 		}
+		newAgent := NewAgent(hbMsg.Hostname, wsConn)
+		agent := h.lookup.GetOrAdd(*newAgent)
+		if iterNum%HBMOD == 0 {
+			log.Printf("got agent heartbeat %s", *agent)
+		}
+		iterNum++
+		if time.Since(lastRecv) > (h.hbInterval * HBGRACEMULTIPLIER) {
+			util.LogWarnf("(late heartbeat) removing agent %s from alive set", *agent)
+			h.lookup.Remove(*agent)
+			break
+		}
+		lastRecv = time.Now()
 	}
 }
 
