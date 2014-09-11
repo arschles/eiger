@@ -44,21 +44,21 @@ func (h *socketHandler) serve(wsConn *websocket.Conn) {
 		}()
 
 		select {
-			case err := <-errCh:
-				util.LogWarnf("(parsing heartbeat message) %s", err)
+		case err := <-errCh:
+			util.LogWarnf("(parsing heartbeat message) %s", err)
+			break
+		case recv := <-recvCh:
+			newAgent := NewAgent(recv.Hostname, wsConn)
+			agent := h.lookup.GetOrAdd(*newAgent)
+			if iterNum%HBMOD == 0 {
+				log.Printf("got agent heartbeat %s", *agent)
+			}
+			iterNum++
+			if time.Since(lastRecv) > (h.hbInterval * HBGRACEMULTIPLIER) {
+				util.LogWarnf("(late heartbeat) removing agent %s from alive set", *agent)
+				h.lookup.Remove(*agent)
 				break
-			case recv := <-recvCh:
-				newAgent := NewAgent(recv.Hostname, wsConn)
-				agent := h.lookup.GetOrAdd(*newAgent)
-				if iterNum%HBMOD == 0 {
-					log.Printf("got agent heartbeat %s", *agent)
-				}
-				iterNum++
-				if time.Since(lastRecv) > (h.hbInterval * HBGRACEMULTIPLIER) {
-					util.LogWarnf("(late heartbeat) removing agent %s from alive set", *agent)
-					h.lookup.Remove(*agent)
-					break
-				}
+			}
 		}
 	}
 }
