@@ -1,64 +1,30 @@
 package main
 
 import (
-    "time"
-    "github.com/arschles/eiger/lib/util"
+	"github.com/arschles/eiger/lib/util"
+	"time"
 )
 
-type HeartbeatLoop struct {
-    lookup *AgentLookup
-    hbDur time.Duration
-    notifyCh chan Agent
-}
+//agentWatcher runs a watch loop on agent, expecting a heartbeat on ticker every
+//interval. if it doesn't get a heartbeat in interval (plus a built in grace
+//period), the loop stops and sends on removed
+func agentWatcher(agent Agent,
+	interval time.Duration,
+	ticker <-chan interface{},
+	removed chan<- interface{}) {
 
-func NewHeartbeatLoop(l *AgentLookup, hbDur time.Duration) *HeartbeatLoop {
-    notifyCh := make(chan Agent)
-    loop := HeartbeatLoop{l, hbDur, notifyCh}
-
-    go loop.run()
-
-    return &loop
-}
-
-//Notify tells the heartbeat loop that an agent has either heartbeated
-//or has been added
-func (h *HeartbeatLoop) Notify(a Agent) {
-    h.notifyCh <- a
-}
-
-func (h *HeartbeatLoop) agentWatcher(agent Agent, ticker <-chan bool) {
-  for {
-      start := time.Now()
-      select {
-      case <-ticker:
-          if time.Since(start) > h.hbDur * 4 {
-              util.LogWarnf("(late heartbeat) removing agent %s from alive set", agent)
-              h.lookup.Remove(agent)
-              return
-          }
-      case <-time.After(h.hbDur * 2):
-          util.LogWarnf("(heartbeat timeout) removing agent %s from alive set", agent)
-          h.lookup.Remove(agent)
-          return
-      }
-  }
-}
-
-func (h *HeartbeatLoop) run() {
-    tickers := map[Agent]chan bool{}
-    for {
-        select {
-        case agent := <-h.notifyCh:
-            tickerCh, ok := tickers[agent]
-            if !ok {
-                t := make(chan bool)
-                tickers[agent] = t
-                tickerCh = t
-            }
-            go h.agentWatcher(agent, tickerCh)
-            go func() {
-                tickerCh <- true
-            }()
-        }
-    }
+	for {
+		start := time.Now()
+		select {
+		case <-ticker:
+			if time.Since(start) > interval*4 {
+				util.LogWarnf("(late heartbeat) removing agent %s from alive set", agent)
+				break
+			}
+		case <-time.After(interval * 2):
+			util.LogWarnf("(heartbeat timeout) removing agent %s from alive set", agent)
+			break
+		}
+	}
+	removed <- struct{}{}
 }

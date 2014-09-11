@@ -1,11 +1,11 @@
 package util
 
 import (
-    "log"
-    "fmt"
+	"fmt"
+	"log"
 )
 
 func LogWarnf(fmtstr string, i ...interface{}) {
-    s := fmt.Sprintf(fmtstr, i...)
-    log.Printf("[WARN] %s", s)
+	s := fmt.Sprintf(fmtstr, i...)
+	log.Printf("[WARN] %s", s)
 }
