@@ -21,32 +21,45 @@ type socketHandler struct {
 //TODO: make this configurable
 const HBMOD = 10
 
+//the multiplier for grace period between heartbeats
+//TODO: make this configurable
+const HBGRACEMULTIPLIER = 4
+
 func (h *socketHandler) serve(wsConn *websocket.Conn) {
-	watcherRunning := false
-	tickerCh := make(chan interface{})
-	removedCh := make(chan interface{})
+
+	lastRecv := time.Now()
 	iterNum := 0
+
 	for {
-		//TODO: have the heartbeat loop communicate back when the agent is dead
-		hbMsg, err := heartbeat.DecodeMessage(wsConn)
-		if err != nil {
-			util.LogWarnf("(parsing heartbeat message) %s", err)
-			break
-		}
+		recvCh := make(chan heartbeat.Message)
+		errCh := make(chan error)
+		//TODO: have a way to kill this goroutine
+		go func() {
+			hbMsg, err := heartbeat.DecodeMessage(wsConn)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			recvCh <- *hbMsg
+		}()
 
-		newAgent := NewAgent(hbMsg.Hostname, wsConn)
-		agent := h.lookup.GetOrAdd(*newAgent)
-		if iterNum%HBMOD == 0 {
-			log.Printf("got agent %s", *agent)
+		select {
+			case err := <-errCh:
+				util.LogWarnf("(parsing heartbeat message) %s", err)
+				break
+			case recv := <-recvCh:
+				newAgent := NewAgent(recv.Hostname, wsConn)
+				agent := h.lookup.GetOrAdd(*newAgent)
+				if iterNum%HBMOD == 0 {
+					log.Printf("got agent heartbeat %s", *agent)
+				}
+				iterNum++
+				if time.Since(lastRecv) > (h.hbInterval * HBGRACEMULTIPLIER) {
+					util.LogWarnf("(late heartbeat) removing agent %s from alive set", *agent)
+					h.lookup.Remove(*agent)
+					break
+				}
 		}
-		iterNum++
-
-		if !watcherRunning {
-			log.Printf("starting watch loop for agent %s", *agent)
-			go agentWatcher(*agent, h.hbInterval, tickerCh, removedCh)
-		}
-
-		tickerCh <- struct{}{}
 	}
 }
 
