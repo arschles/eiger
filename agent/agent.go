@@ -1,15 +1,15 @@
 package main
 
 import (
+	"code.google.com/p/go.net/websocket"
 	"fmt"
 	"github.com/arschles/eiger/lib/util"
 	"github.com/codegangsta/cli"
 	"github.com/fsouza/go-dockerclient"
 	"log"
-	"time"
 	"net/rpc"
 	"net/rpc/jsonrpc"
-	"code.google.com/p/go.net/websocket"
+	"time"
 )
 
 func serve(wsConn *websocket.Conn, dclient *docker.Client, diedCh chan<- error) {
@@ -48,7 +48,6 @@ func agent(c *cli.Context) {
 	heartbeatDied := make(chan error)
 	go heartbeatLoop(wsConn, hbInterval, heartbeatDied)
 	log.Printf("started heartbeat loop")
-
 
 	for {
 		select {

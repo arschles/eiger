@@ -1,57 +1,74 @@
 package main
 
 import (
-    "fmt"
-    "github.com/codegangsta/cli"
-    "log"
-    "net/http"
-    "time"
-    "code.google.com/p/go.net/websocket"
-    "github.com/gorilla/mux"
-    "github.com/arschles/eiger/lib/heartbeat"
-    "github.com/arschles/eiger/lib/util"
+	"code.google.com/p/go.net/websocket"
+	"fmt"
+	"github.com/arschles/eiger/lib/heartbeat"
+	"github.com/arschles/eiger/lib/util"
+	"github.com/codegangsta/cli"
+	"github.com/gorilla/mux"
+	"log"
+	"net/http"
+	"time"
 )
 
 type socketHandler struct {
-    lookup *AgentLookup
-    hbLoop *HeartbeatLoop
+	lookup     *AgentLookup
+	hbInterval time.Duration
 }
 
+//the modulo value for printing heartbeat notifications
+//TODO: make this configurable
+const HBMOD = 10
+
+//the multiplier for grace period between heartbeats
+//TODO: make this configurable
+const HBGRACEMULTIPLIER = 4
 
 func (h *socketHandler) serve(wsConn *websocket.Conn) {
-    for {
-        //TODO: have the heartbeat loop communicate back when the agent is dead
-        hbMsg, err := heartbeat.DecodeMessage(wsConn)
-        if err != nil {
-            util.LogWarnf("(parsing heartbeat message) %s", err)
-            return
-        }
-        newAgent := NewAgent(hbMsg.Hostname, wsConn)
-        log.Printf("got agent %s", *newAgent)
-        agent := h.lookup.GetOrAdd(*newAgent)
-        h.hbLoop.Notify(*agent)
-    }
+
+	lastRecv := time.Now()
+	iterNum := 0
+
+	for {
+		hbMsg, err := heartbeat.DecodeMessage(wsConn)
+		if err != nil {
+			util.LogWarnf("(parsing heartbeat message) %s", err)
+			break
+		}
+		newAgent := NewAgent(hbMsg.Hostname, wsConn)
+		agent := h.lookup.GetOrAdd(*newAgent)
+		if iterNum%HBMOD == 0 {
+			log.Printf("got agent heartbeat %s", *agent)
+		}
+		iterNum++
+		if time.Since(lastRecv) > (h.hbInterval * HBGRACEMULTIPLIER) {
+			util.LogWarnf("(late heartbeat) removing agent %s from alive set", *agent)
+			h.lookup.Remove(*agent)
+			break
+		}
+		lastRecv = time.Now()
+	}
 }
 
 func service(c *cli.Context) {
-    ip := c.String("ip")
-    port := c.Int("port")
-    serveStr := fmt.Sprintf("%s:%d", ip, port)
-    log.Printf("eiger-service listening on %s", serveStr)
+	ip := c.String("ip")
+	port := c.Int("port")
+	serveStr := fmt.Sprintf("%s:%d", ip, port)
+	log.Printf("eiger-service listening on %s", serveStr)
 
-    hbDur := time.Duration(c.Int("heartbeat")) * time.Millisecond
-    set := NewAgentLookup(&[]Agent{})
-    hbLoop := NewHeartbeatLoop(set, hbDur)
+	hbInterval := time.Duration(c.Int("heartbeat")) * time.Millisecond
+	set := NewAgentLookup(&[]Agent{})
 
-    socketHandler := socketHandler{set, hbLoop}
+	socketHandler := socketHandler{set, hbInterval}
 
-    router := mux.NewRouter()
-    //REST verbs
-    //r.HandleFunc("/agents", agentsFunc).Methods("GET")
+	router := mux.NewRouter()
+	//REST verbs
+	//r.HandleFunc("/agents", agentsFunc).Methods("GET")
 
-    //Socket verb
-    router.Handle("/socket", websocket.Handler(socketHandler.serve))
+	//Socket verb
+	router.Handle("/socket", websocket.Handler(socketHandler.serve))
 
-    //listen on websocket
-    log.Fatal(http.ListenAndServe(serveStr, router))
+	//listen on websocket
+	log.Fatal(http.ListenAndServe(serveStr, router))
 }
