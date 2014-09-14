@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"time"
+	"runtime"
 )
 
 //the modulo value for printing heartbeat notifications
@@ -24,6 +25,10 @@ const HeartbeatGraceMultiplier = 4
 //heartbeat connection.
 //TODO: make this configurable
 const MaxNumLateHeartbeats = 10
+
+//the maximum number of errors receiving docker events allowed
+//TODO: make this configurable
+const MaxNumDockerEventErrors = 10
 
 func publishAll(payload *pubsub.Payload, publishers []pubsub.Publisher) {
 	for _, publisher := range publishers {
@@ -45,15 +50,15 @@ func (h *heartbeatHandler) serve(wsConn *websocket.Conn) {
 		hbMsg := messages.Heartbeat{}
 		err := websocket.JSON.Receive(wsConn, &hbMsg)
 		if err != nil {
-			payload := pubsub.Payload{pubsub.HeartbeatErrorTopic, err}
-			publishAll(&payload, h.publishers)
+			payload := pubsub.NewPayload(pubsub.HeartbeatErrorTopic, err)
+			publishAll(payload, h.publishers)
 			break
 		}
 		newAgent := NewAgent(hbMsg.Hostname, wsConn)
 		agent := h.lookup.GetOrAdd(*newAgent)
 		if time.Since(lastRecv) > (h.hbInterval * HeartbeatGraceMultiplier) {
-			payload := pubsub.Payload{pubsub.LateHeartbeatTopic, *agent}
-			publishAll(&payload, h.publishers)
+			payload := pubsub.NewPayload(pubsub.LateHeartbeatTopic, *agent)
+			publishAll(payload, h.publishers)
 			h.lookup.Remove(*agent)
 			if numLate > MaxNumLateHeartbeats {
 				break
@@ -65,11 +70,11 @@ func (h *heartbeatHandler) serve(wsConn *websocket.Conn) {
 		}
 
 		if iterNum%HeartbeatModulus == 0 {
-			payload := pubsub.Payload{pubsub.HeartbeatTopic, map[string]string{
+			payload := pubsub.NewPayload(pubsub.HeartbeatTopic, map[string]string{
 				"heartbeat_num": fmt.Sprintf("%d", iterNum),
 				"agent":         fmt.Sprintf("%s", *agent),
-			}}
-			publishAll(&payload, h.publishers)
+			})
+			publishAll(payload, h.publishers)
 		}
 
 		iterNum++
@@ -83,14 +88,21 @@ type dockerEventsHandler struct {
 }
 
 func (d *dockerEventsHandler) serve(wsConn *websocket.Conn) {
+	numErrs := 0
 	for {
 		evts := messages.DockerEvents{}
 		err := websocket.JSON.Receive(wsConn, &evts)
-		payload := pubsub.Payload{pubsub.DockerEventsTopic, evts}
 		if err != nil {
-			payload = pubsub.Payload{pubsub.DockerEventsErrorTopic, err}
+			payload := pubsub.NewPayload(pubsub.DockerEventsErrorTopic, err)
+			publishAll(payload, d.publishers)
+			if numErrs > MaxNumDockerEventErrors {
+				break
+			}
+			numErrs++
+			continue
 		}
-		publishAll(&payload, d.publishers)
+		payload := pubsub.NewPayload(pubsub.DockerEventsTopic, evts)
+		publishAll(payload, d.publishers)
 	}
 }
 
@@ -99,7 +111,7 @@ type rpcHandler struct {
 
 func (r *rpcHandler) serve(ws *websocket.Conn) {
 	for {
-		time.Sleep(1 * time.Hour)
+		runtime.Gosched()
 		//websocket.JSON.Receive(wsConn, rpcMethod)
 	}
 }

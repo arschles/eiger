@@ -17,6 +17,13 @@ type Payload struct {
 	Data  interface{}
 }
 
+func NewPayload(topic string, data interface{}) *Payload {
+  return &Payload {
+    Topic: topic,
+    Data: data,
+  }
+}
+
 //Publisher publishes payloads to somewhere
 type Publisher interface {
 	Publish(p *Payload)
