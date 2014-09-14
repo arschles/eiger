@@ -28,6 +28,12 @@ func main() {
 			Usage:  "the longest allowable latency between heartbeats, in milliseconds",
 			EnvVar: "EIGER_HEARTBEAT",
 		},
+		cli.StringSliceFlag{
+			Name: "publishtypes,pts",
+			Value: &cli.StringSlice{"log"},
+			Usage: "the methods by which the eiger service should publish incoming data",
+			EnvVar: "EIGER_PUBLISH_TYPES",
+		},
 	}
 	app.Version = "0.1.0"
 	app.Action = service
