@@ -129,9 +129,9 @@ func parsePublishers(slice []string) []pubsub.Publisher {
 
 func service(c *cli.Context) {
 
-	publishers := parsePublishers(c.StringSlice("publishtypes"))
+	publishers := parsePublishers(c.StringSlice("service-publish-types"))
 
-	hbInterval := time.Duration(c.Int("heartbeat")) * time.Millisecond
+	hbInterval := time.Duration(c.Int("service-heartbeat")) * time.Millisecond
 	lookup := NewAgentLookup(&[]Agent{})
 
 	hbHandler := heartbeatHandler{lookup, hbInterval, publishers}
@@ -144,9 +144,9 @@ func service(c *cli.Context) {
 	router.Handle("/docker", websocket.Handler(dockerEvtsHandler.serve))
 	router.Handle("/rpc", websocket.Handler(rpcHandler.serve))
 
-	ip := c.String("ip")
-	port := c.Int("port")
-	serveStr := fmt.Sprintf("%s:%d", ip, port)
+	host := c.String("service-host")
+	port := c.Int("service-port")
+	serveStr := fmt.Sprintf("%s:%d", host, port)
 
 	log.Printf("eiger-service listening on %s", serveStr)
 	log.Fatal(http.ListenAndServe(serveStr, router))
