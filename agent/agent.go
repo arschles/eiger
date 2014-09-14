@@ -31,7 +31,7 @@ func startHb(origin string, host string, port int, interval time.Duration) <-cha
 	hbConn := dialOrDie(fmt.Sprintf("ws://%s:%d/heartbeat", host, port), origin)
 	heartbeatDied := make(chan error)
 	go heartbeatLoop(hbConn, interval, heartbeatDied)
-	log.Printf("started heartbeat loop")
+	log.Printf("started heartbeat loop with interval %d", interval)
 	return heartbeatDied
 }
 
