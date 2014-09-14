@@ -12,23 +12,42 @@ import (
 	"time"
 )
 
+//the modulo value for printing heartbeat notifications
+//TODO: make this configurable
+const HBMOD = 10
+
+//the multiplier for grace period between heartbeats
+//TODO: make this configurable
+const HBGRACEMULTIPLIER = 4
+
 type heartbeatHandler struct {
-	lookup *AgentLookup
-	hbLoop *HeartbeatLoop
+	lookup     *AgentLookup
+	hbInterval time.Duration
 }
 
 func (h *heartbeatHandler) serve(wsConn *websocket.Conn) {
+	lastRecv := time.Now()
+	iterNum := 0
+
 	for {
-		//TODO: have the heartbeat loop communicate back when the agent is dead
 		hbMsg := messages.Heartbeat{}
 		err := websocket.JSON.Receive(wsConn, &hbMsg)
 		if err != nil {
 			util.LogWarnf("(parsing heartbeat message) %s", err)
-			return
+			break
 		}
 		newAgent := NewAgent(hbMsg.Hostname, wsConn)
 		agent := h.lookup.GetOrAdd(*newAgent)
-		h.hbLoop.Notify(*agent)
+		if iterNum%HBMOD == 0 {
+			log.Printf("got agent heartbeat %s", *agent)
+		}
+		iterNum++
+		if time.Since(lastRecv) > (h.hbInterval * HBGRACEMULTIPLIER) {
+			util.LogWarnf("(late heartbeat) removing agent %s from alive set", *agent)
+			h.lookup.Remove(*agent)
+			break
+		}
+		lastRecv = time.Now()
 	}
 }
 
@@ -37,28 +56,27 @@ type dockerEventsHandler struct {
 
 func (d *dockerEventsHandler) serve(wsConn *websocket.Conn) {
 	for {
-		time.Sleep(1*time.Hour)
+		time.Sleep(1 * time.Hour)
 		//websocket.JSON.Receive(wsConn, dockerEvent)
 	}
 }
 
 type rpcHandler struct {
-
 }
 
 func (r *rpcHandler) serve(ws *websocket.Conn) {
 	for {
-		time.Sleep(1*time.Hour)
+		time.Sleep(1 * time.Hour)
 		//websocket.JSON.Receive(wsConn, rpcMethod)
 	}
 }
 
 func service(c *cli.Context) {
-	hbDur := time.Duration(c.Int("heartbeat")) * time.Millisecond
-	set := NewAgentLookup(&[]Agent{})
-	hbLoop := NewHeartbeatLoop(set, hbDur)
 
-	hbHandler := heartbeatHandler{set, hbLoop}
+	hbInterval := time.Duration(c.Int("heartbeat")) * time.Millisecond
+	lookup := NewAgentLookup(&[]Agent{})
+
+	hbHandler := heartbeatHandler{lookup, hbInterval}
 	dockerEvtsHandler := dockerEventsHandler{}
 	rpcHandler := rpcHandler{}
 
@@ -73,6 +91,7 @@ func service(c *cli.Context) {
 	ip := c.String("ip")
 	port := c.Int("port")
 	serveStr := fmt.Sprintf("%s:%d", ip, port)
+
 	log.Printf("eiger-service listening on %s", serveStr)
 	log.Fatal(http.ListenAndServe(serveStr, router))
 }
