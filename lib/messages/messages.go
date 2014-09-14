@@ -2,6 +2,7 @@ package messages
 
 import (
 	"time"
+	"github.com/fsouza/go-dockerclient"
 )
 
 //HeartbeatMessage represents the JSON structure that's sent over the wire
@@ -10,9 +11,7 @@ type Heartbeat struct {
 	SendTime time.Time `json:"time"`
 }
 
-type DockerEvent struct {
-	//TODO: fill in
-}
+type DockerEvents docker.APIEvents
 
 type DockerLog struct {
 	Container string `json:"container"`

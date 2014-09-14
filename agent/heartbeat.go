@@ -42,7 +42,7 @@ func heartbeatLoop(wsConn *websocket.Conn, interval time.Duration, diedCh chan<-
 		err := websocket.JSON.Send(wsConn, msg)
 
 		if err != nil {
-			util.LogWarnf("(error heartbeating) %s", err)
+			util.LogWarnf("(heartbeat) %s", err)
 			if lastFailed && numFails >= HBFAILTHRESH {
 				break
 			}

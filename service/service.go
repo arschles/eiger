@@ -56,8 +56,14 @@ type dockerEventsHandler struct {
 
 func (d *dockerEventsHandler) serve(wsConn *websocket.Conn) {
 	for {
-		time.Sleep(1 * time.Hour)
-		//websocket.JSON.Receive(wsConn, dockerEvent)
+		evts := messages.DockerEvents{}
+		err := websocket.JSON.Receive(wsConn, &evts)
+		if err != nil {
+			util.LogWarnf("(parsing docker events) %s", err)
+			break
+		}
+		//TODO: write to database
+		log.Printf("received docker events %s", evts)
 	}
 }
 
