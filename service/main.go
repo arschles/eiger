@@ -29,9 +29,9 @@ func main() {
 			EnvVar: "EIGER_HEARTBEAT",
 		},
 		cli.StringSliceFlag{
-			Name: "publishtypes,pts",
-			Value: &cli.StringSlice{"log"},
-			Usage: "the methods by which the eiger service should publish incoming data",
+			Name:   "publishtypes,pts",
+			Value:  &cli.StringSlice{"log"},
+			Usage:  "the methods by which the eiger service should publish incoming data",
 			EnvVar: "EIGER_PUBLISH_TYPES",
 		},
 	}

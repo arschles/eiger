@@ -65,9 +65,9 @@ func (h *heartbeatHandler) serve(wsConn *websocket.Conn) {
 		}
 
 		if iterNum%HeartbeatModulus == 0 {
-			payload := pubsub.Payload{pubsub.HeartbeatTopic, map[string]string {
+			payload := pubsub.Payload{pubsub.HeartbeatTopic, map[string]string{
 				"heartbeat_num": fmt.Sprintf("%d", iterNum),
-				"agent": fmt.Sprintf("%s", *agent),
+				"agent":         fmt.Sprintf("%s", *agent),
 			}}
 			publishAll(&payload, h.publishers)
 		}
