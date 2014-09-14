@@ -122,6 +122,8 @@ func parsePublishers(slice []string) []pubsub.Publisher {
 		switch str {
 		case "log":
 			pslice = append(pslice, pubsub.LoggingPublisher{})
+		case "inmem":
+			pslice = append(pslice, pubsub.InMemPublisherSubscriber{})
 		}
 	}
 	return pslice

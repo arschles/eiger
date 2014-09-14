@@ -1,9 +1,5 @@
 package pubsub
 
-import (
-	"log"
-)
-
 const (
 	HeartbeatTopic         = "heartbeat"
 	HeartbeatErrorTopic    = "heartbeat_error"
@@ -32,11 +28,4 @@ type Publisher interface {
 //Subscriber gets payloads that have a specific topic
 type Subscriber interface {
 	Subscribe(topic string) <-chan *Payload
-}
-
-type LoggingPublisher struct {
-}
-
-func (n LoggingPublisher) Publish(p *Payload) {
-	log.Printf("(%s) %s", p.Topic, p.Data)
 }

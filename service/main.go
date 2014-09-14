@@ -30,7 +30,7 @@ func main() {
 		},
 		cli.StringSliceFlag{
 			Name:   "service-publish-types,spt",
-			Value:  &cli.StringSlice{"log"},
+			Value:  &cli.StringSlice{"log", "inmem"},
 			Usage:  "the methods by which the service should publish incoming data",
 			EnvVar: "EIGER_SERVICE_PUBLISH_TYPES",
 		},
@@ -48,7 +48,7 @@ func main() {
 		},
 		cli.StringSliceFlag{
 			Name:"api-subscribe-types,ast",
-			Value: &cli.StringSlice{"ptp-udp"},
+			Value: &cli.StringSlice{"inmem"},
 			Usage: "the methods by which the api should listen for published data",
 			EnvVar:"EIGER_API_SUBSCRIBE_TYPES",
 		},
