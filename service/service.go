@@ -9,8 +9,8 @@ import (
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
-	"time"
 	"runtime"
+	"time"
 )
 
 //the modulo value for printing heartbeat notifications

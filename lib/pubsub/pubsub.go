@@ -18,10 +18,10 @@ type Payload struct {
 }
 
 func NewPayload(topic string, data interface{}) *Payload {
-  return &Payload {
-    Topic: topic,
-    Data: data,
-  }
+	return &Payload{
+		Topic: topic,
+		Data:  data,
+	}
 }
 
 //Publisher publishes payloads to somewhere
