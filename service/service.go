@@ -3,7 +3,7 @@ package main
 import (
 	"code.google.com/p/go.net/websocket"
 	"fmt"
-	"github.com/arschles/eiger/lib/heartbeat"
+	"github.com/arschles/eiger/lib/messages"
 	"github.com/arschles/eiger/lib/util"
 	"github.com/codegangsta/cli"
 	"github.com/gorilla/mux"
@@ -11,11 +11,6 @@ import (
 	"net/http"
 	"time"
 )
-
-type socketHandler struct {
-	lookup     *AgentLookup
-	hbInterval time.Duration
-}
 
 //the modulo value for printing heartbeat notifications
 //TODO: make this configurable
@@ -25,13 +20,18 @@ const HBMOD = 10
 //TODO: make this configurable
 const HBGRACEMULTIPLIER = 4
 
-func (h *socketHandler) serve(wsConn *websocket.Conn) {
+type heartbeatHandler struct {
+	lookup     *AgentLookup
+	hbInterval time.Duration
+}
 
+func (h *heartbeatHandler) serve(wsConn *websocket.Conn) {
 	lastRecv := time.Now()
 	iterNum := 0
 
 	for {
-		hbMsg, err := heartbeat.DecodeMessage(wsConn)
+		hbMsg := messages.Heartbeat{}
+		err := websocket.JSON.Receive(wsConn, &hbMsg)
 		if err != nil {
 			util.LogWarnf("(parsing heartbeat message) %s", err)
 			break
@@ -51,24 +51,53 @@ func (h *socketHandler) serve(wsConn *websocket.Conn) {
 	}
 }
 
+type dockerEventsHandler struct {
+}
+
+func (d *dockerEventsHandler) serve(wsConn *websocket.Conn) {
+	for {
+		evts := messages.DockerEvents{}
+		err := websocket.JSON.Receive(wsConn, &evts)
+		if err != nil {
+			util.LogWarnf("(parsing docker events) %s", err)
+			break
+		}
+		//TODO: write to database
+		log.Printf("received docker events %s", evts)
+	}
+}
+
+type rpcHandler struct {
+}
+
+func (r *rpcHandler) serve(ws *websocket.Conn) {
+	for {
+		time.Sleep(1 * time.Hour)
+		//websocket.JSON.Receive(wsConn, rpcMethod)
+	}
+}
+
 func service(c *cli.Context) {
-	ip := c.String("ip")
-	port := c.Int("port")
-	serveStr := fmt.Sprintf("%s:%d", ip, port)
-	log.Printf("eiger-service listening on %s", serveStr)
 
 	hbInterval := time.Duration(c.Int("heartbeat")) * time.Millisecond
-	set := NewAgentLookup(&[]Agent{})
+	lookup := NewAgentLookup(&[]Agent{})
 
-	socketHandler := socketHandler{set, hbInterval}
+	hbHandler := heartbeatHandler{lookup, hbInterval}
+	dockerEvtsHandler := dockerEventsHandler{}
+	rpcHandler := rpcHandler{}
 
 	router := mux.NewRouter()
 	//REST verbs
 	//r.HandleFunc("/agents", agentsFunc).Methods("GET")
 
-	//Socket verb
-	router.Handle("/socket", websocket.Handler(socketHandler.serve))
+	router.Handle("/heartbeat", websocket.Handler(hbHandler.serve))
+	router.Handle("/docker", websocket.Handler(dockerEvtsHandler.serve))
+	router.Handle("/rpc", websocket.Handler(rpcHandler.serve))
 
-	//listen on websocket
+	ip := c.String("ip")
+	port := c.Int("port")
+	serveStr := fmt.Sprintf("%s:%d", ip, port)
+
+	log.Printf("eiger-service listening on %s", serveStr)
 	log.Fatal(http.ListenAndServe(serveStr, router))
 }
