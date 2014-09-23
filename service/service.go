@@ -4,7 +4,7 @@ import (
 	"code.google.com/p/go.net/websocket"
 	"fmt"
 	"github.com/arschles/eiger/lib/messages"
-	"github.com/arschles/eiger/lib/pubsub"
+	"github.com/arschles/eiger/lib/util"
 	"github.com/codegangsta/cli"
 	"github.com/gorilla/mux"
 	"log"
@@ -30,16 +30,10 @@ const MaxNumLateHeartbeats = 10
 //TODO: make this configurable
 const MaxNumDockerEventErrors = 10
 
-func publishAll(payload *pubsub.Payload, publishers []pubsub.Publisher) {
-	for _, publisher := range publishers {
-		publisher.Publish(payload)
-	}
-}
-
 type heartbeatHandler struct {
 	lookup     *AgentLookup
 	hbInterval time.Duration
-	publishers []pubsub.Publisher
+	streamChan chan<-interface{}
 }
 
 func (h *heartbeatHandler) serve(wsConn *websocket.Conn) {
@@ -50,16 +44,15 @@ func (h *heartbeatHandler) serve(wsConn *websocket.Conn) {
 		hbMsg := messages.Heartbeat{}
 		err := websocket.JSON.Receive(wsConn, &hbMsg)
 		if err != nil {
-			payload := pubsub.NewPayload(pubsub.HeartbeatErrorTopic, err)
-			publishAll(payload, h.publishers)
+			h.streamChan <- err
 			break
 		}
 		newAgent := NewAgent(hbMsg.Hostname, wsConn)
 		agent := h.lookup.GetOrAdd(*newAgent)
 		if time.Since(lastRecv) > (h.hbInterval * HeartbeatGraceMultiplier) {
-			payload := pubsub.NewPayload(pubsub.LateHeartbeatTopic, *agent)
-			publishAll(payload, h.publishers)
+			h.streamChan <- fmt.Sprintf("removed %s", *agent)
 			h.lookup.Remove(*agent)
+			lastRecv = time.Now()
 			if numLate > MaxNumLateHeartbeats {
 				break
 			} else {
@@ -69,13 +62,11 @@ func (h *heartbeatHandler) serve(wsConn *websocket.Conn) {
 			}
 		}
 
-		if iterNum%HeartbeatModulus == 0 {
-			payload := pubsub.NewPayload(pubsub.HeartbeatTopic, map[string]string{
-				"heartbeat_num": fmt.Sprintf("%d", iterNum),
-				"agent":         fmt.Sprintf("%s", *agent),
-			})
-			publishAll(payload, h.publishers)
+		payload := map[string]string{
+			"heartbeat_num": fmt.Sprintf("%d", iterNum),
+			"agent":         fmt.Sprintf("%s", *agent),
 		}
+		h.streamChan <- payload
 
 		iterNum++
 
@@ -84,7 +75,7 @@ func (h *heartbeatHandler) serve(wsConn *websocket.Conn) {
 }
 
 type dockerEventsHandler struct {
-	publishers []pubsub.Publisher
+	streamChan chan<-interface{}
 }
 
 func (d *dockerEventsHandler) serve(wsConn *websocket.Conn) {
@@ -93,20 +84,19 @@ func (d *dockerEventsHandler) serve(wsConn *websocket.Conn) {
 		evts := messages.DockerEvents{}
 		err := websocket.JSON.Receive(wsConn, &evts)
 		if err != nil {
-			payload := pubsub.NewPayload(pubsub.DockerEventsErrorTopic, err)
-			publishAll(payload, d.publishers)
+			d.streamChan <- err
 			if numErrs > MaxNumDockerEventErrors {
 				break
 			}
 			numErrs++
 			continue
 		}
-		payload := pubsub.NewPayload(pubsub.DockerEventsTopic, evts)
-		publishAll(payload, d.publishers)
+		d.streamChan <- evts
 	}
 }
 
 type rpcHandler struct {
+	streamChan chan<- interface{}
 }
 
 func (r *rpcHandler) serve(ws *websocket.Conn) {
@@ -116,39 +106,59 @@ func (r *rpcHandler) serve(ws *websocket.Conn) {
 	}
 }
 
-func parsePublishers(slice []string) []pubsub.Publisher {
-	pslice := []pubsub.Publisher{}
-	for _, str := range slice {
-		switch str {
-		case "log":
-			pslice = append(pslice, pubsub.LoggingPublisher{})
-		case "inmem":
-			pslice = append(pslice, pubsub.InMemPublisherSubscriber{})
-		}
-	}
-	return pslice
+type streamHandler struct {
+	b *util.Broadcaster
 }
+
+func (s *streamHandler) serve(ws *websocket.Conn) {
+	ch := s.b.NewChan()
+	for {
+		evt := <-ch
+		log.Printf("%s", evt)
+		websocket.JSON.Send(ws, evt)
+	}
+}
+
 
 func service(c *cli.Context) {
 
-	publishers := parsePublishers(c.StringSlice("service-publish-types"))
-
-	hbInterval := time.Duration(c.Int("service-heartbeat")) * time.Millisecond
+	hbInterval := time.Duration(c.Int("heartbeat")) * time.Millisecond
 	lookup := NewAgentLookup(&[]Agent{})
 
-	hbHandler := heartbeatHandler{lookup, hbInterval, publishers}
-	dockerEvtsHandler := dockerEventsHandler{publishers}
-	rpcHandler := rpcHandler{}
+	streamChan := make(chan interface{})
+	broadcaster := util.NewBroadcaster(streamChan)
+
+	hbHandler := heartbeatHandler{lookup, hbInterval, streamChan}
+	dockerEvtsHandler := dockerEventsHandler{streamChan}
+	rpcHandler := rpcHandler{streamChan}
+	streamHandler := streamHandler{broadcaster}
 
 	router := mux.NewRouter()
 
 	router.Handle("/heartbeat", websocket.Handler(hbHandler.serve))
 	router.Handle("/docker", websocket.Handler(dockerEvtsHandler.serve))
 	router.Handle("/rpc", websocket.Handler(rpcHandler.serve))
+	router.Handle("/stream", websocket.Handler(streamHandler.serve))
 
-	host := c.String("service-host")
-	port := c.Int("service-port")
+	host := c.String("host")
+	port := c.Int("port")
 	serveStr := fmt.Sprintf("%s:%d", host, port)
+
+	//start the logging goroutine
+	go func() {
+		ch := broadcaster.NewChan()
+		n := 0
+		for {
+			value := <-ch
+			switch t := value.(type) {
+			case messages.DockerEvents:
+				log.Printf("%s", t)
+			default:
+				log.Printf("%s", t)
+			}
+			n++
+		}
+	}()
 
 	log.Printf("eiger-service listening on %s", serveStr)
 	log.Fatal(http.ListenAndServe(serveStr, router))
