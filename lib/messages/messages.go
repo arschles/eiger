@@ -1,8 +1,8 @@
 package messages
 
 import (
-	"time"
 	"github.com/fsouza/go-dockerclient"
+	"time"
 )
 
 //HeartbeatMessage represents the JSON structure that's sent over the wire

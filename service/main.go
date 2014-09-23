@@ -11,22 +11,22 @@ func main() {
 	app.Usage = "connection service between eiger-agent and the eiger backend"
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:   "ip,i",
+			Name:   "host,sh",
 			Value:  "127.0.0.1",
-			Usage:  "the IP address to listen on",
-			EnvVar: "EIGER_HOST",
+			Usage:  "the host for the service to listen on",
+			EnvVar: "EIGER_SERVICE_HOST",
 		},
 		cli.IntFlag{
-			Name:   "port,p",
+			Name:   "port,sp",
 			Value:  4492,
-			Usage:  "the port to listen on",
-			EnvVar: "EIGER_PORT",
+			Usage:  "the port for the service to listen on",
+			EnvVar: "EIGER_SERVICE_PORT",
 		},
 		cli.IntFlag{
 			Name:   "heartbeat,b",
 			Value:  2000,
-			Usage:  "the longest allowable latency between heartbeats, in milliseconds",
-			EnvVar: "EIGER_HEARTBEAT",
+			Usage:  "the longest duration (milliseconds) that the service will wait to hear back from an agent",
+			EnvVar: "EIGER_SERVICE_HEARTBEAT",
 		},
 	}
 	app.Version = "0.1.0"
