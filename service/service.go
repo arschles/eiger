@@ -138,7 +138,10 @@ func service(c *cli.Context) {
 	router.Handle("/heartbeat", websocket.Handler(hbHandler.serve))
 	router.Handle("/docker", websocket.Handler(dockerEvtsHandler.serve))
 	router.Handle("/rpc", websocket.Handler(rpcHandler.serve))
-	router.Handle("/stream", websocket.Handler(streamHandler.serve))
+
+	//this is stuff that the dashboard connects on
+	router.PathPrefix("/stream").Handler(websocket.Handler(streamHandler.serve))
+	router.PathPrefix("/").Handler(http.FileServer(http.Dir("dashboard")))
 
 	host := c.String("host")
 	port := c.Int("port")
